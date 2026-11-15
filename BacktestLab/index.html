@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ICT Gold Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{
+  --bg:#0b0f17; --panel:#121826; --panel2:#182033; --line:#243049; --text:#e6ebf5; --muted:#8a96ad;
+  --gold:#e8b84a; --gold2:#f5d67b; --up:#22c58b; --down:#f0506e; --blue:#4c8dff; --warn:#f2a33a;
+  --r:12px; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.55 'Be Vietnam Pro',system-ui,sans-serif;display:flex}
+a{color:var(--gold2)}
+button,input,select,textarea{font:inherit;color:inherit}
+/* ---------- sidebar ---------- */
+#side{width:230px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;height:100vh;position:sticky;top:0}
+.brand{padding:18px 18px 12px;font-weight:700;font-size:17px;letter-spacing:.3px}
+.brand span{color:var(--gold)}
+.brand small{display:block;font-weight:400;font-size:11.5px;color:var(--muted);margin-top:2px}
+#nav{flex:1;overflow:auto;padding:6px 10px}
+#nav a{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:9px;color:var(--text);text-decoration:none;margin:2px 0;font-weight:500}
+#nav a:hover{background:var(--panel2)}
+#nav a.on{background:linear-gradient(90deg,rgba(232,184,74,.18),rgba(232,184,74,.04));color:var(--gold2)}
+#nav .sec{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:14px 12px 4px}
+.sidefoot{padding:12px 16px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--line)}
+#clock{font-family:var(--mono);color:var(--text)}
+/* ---------- main ---------- */
+main{flex:1;min-width:0;height:100vh;overflow:auto}
+.page{display:none;padding:26px 30px 60px;max-width:1500px}
+.page.on{display:block}
+h1{font-size:24px;margin:0 0 4px}
+h2{font-size:18px;margin:26px 0 10px}
+h3{font-size:15.5px;margin:20px 0 8px;color:var(--gold2)}
+.lead{color:var(--muted);margin:0 0 20px}
+.muted{color:var(--muted)}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h4{margin:0 0 8px;font-size:14px}
+.kpi .v{font-size:24px;font-weight:700;font-family:var(--mono)}
+.kpi .l{font-size:12px;color:var(--muted)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:#36466a}
+.btn.pri{background:var(--gold);color:#1b1404;border-color:var(--gold)}
+.btn.pri:hover{background:var(--gold2)}
+.btn.up{background:var(--up);border-color:var(--up);color:#04140d}
+.btn.down{background:var(--down);border-color:var(--down);color:#1d0309}
+.btn.sm{padding:5px 10px;font-size:12.5px}
+.btn.on{border-color:var(--gold);color:var(--gold2)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input[type=text],input[type=number],input[type=date],select,textarea{background:#0e1422;border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+textarea{min-height:60px;resize:vertical}
+label.f{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tbl{border-collapse:collapse;width:100%;margin:8px 0;font-size:13.5px}
+.tbl th,.tbl td{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+.tbl th{color:var(--muted);font-weight:600;font-size:12.5px;background:rgba(255,255,255,.02)}
+.tblwrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:10px}
+.tblwrap .tbl{margin:0}
+.tblwrap th{position:sticky;top:0;background:var(--panel2)}
+.note{background:rgba(76,141,255,.09);border-left:3px solid var(--blue);padding:10px 14px;border-radius:6px;margin:12px 0}
+.note.warn{background:rgba(242,163,58,.09);border-color:var(--warn)}
+.note.bad{background:rgba(240,80,110,.09);border-color:var(--down)}
+.note.ok{background:rgba(34,197,139,.09);border-color:var(--up)}
+pre.flow{background:#0e1422;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;overflow:auto;line-height:1.45}
+code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4px;font-size:12.5px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:600;background:var(--panel2);border:1px solid var(--line)}
+.pill.up{color:var(--up);border-color:rgba(34,197,139,.4)}.pill.down{color:var(--down);border-color:rgba(240,80,110,.4)}.pill.gold{color:var(--gold2);border-color:rgba(232,184,74,.4)}
+.pos{color:var(--up)}.neg{color:var(--down)}
+.bar{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.nolist{list-style:none;padding-left:0}
+/* chapters */
+.chlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.chcard{cursor:pointer;transition:.15s;position:relative}
+.chcard:hover{border-color:var(--gold);transform:translateY(-2px)}
+.chcard .ic{font-size:26px}
+.chcard .num{position:absolute;top:14px;right:16px;font-family:var(--mono);color:var(--muted);font-size:12px}
+.chcard .done{color:var(--up);font-weight:600;font-size:12px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0}
+.tabs button{background:none;border:none;border-bottom:2px solid transparent;padding:9px 14px;cursor:pointer;color:var(--muted);font-weight:600}
+.tabs button.on{color:var(--gold2);border-color:var(--gold)}
+.res a{display:flex;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:9px;margin:6px 0;text-decoration:none;color:var(--text);background:var(--panel2);cursor:pointer}
+.res a:hover{border-color:var(--gold)}
+.task{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:9px;margin:6px 0}
+.task input{margin-top:4px;accent-color:var(--gold);width:16px;height:16px;flex:none}
+/* quiz */
+.qopt{display:block;width:100%;text-align:left;margin:7px 0;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);cursor:pointer}
+.qopt:hover{border-color:#3a4c75}
+.qopt.right{border-color:var(--up);background:rgba(34,197,139,.12)}
+.qopt.wrong{border-color:var(--down);background:rgba(240,80,110,.12)}
+/* lab */
+.labwrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px}
+#chartBox{height:560px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;position:relative;background:#0b0f17}
+#chartBox .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--muted);text-align:center;padding:20px}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.toolbar .sep{width:1px;height:24px;background:var(--line);margin:0 4px}
+.toolbar input[type=date]{width:auto}
+.toolbar select{width:auto}
+#replayInfo{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+.ticket .row>*{flex:1}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{flex:1;background:var(--panel2);border:none;padding:7px;cursor:pointer;font-weight:600}
+.seg button.on.b{background:var(--up);color:#04140d}.seg button.on.s{background:var(--down);color:#1d0309}.seg button.on.n{background:var(--gold);color:#1b1404}
+.chk label{display:flex;gap:8px;font-size:12.5px;padding:3px 0;align-items:flex-start}
+.chk input{accent-color:var(--gold);margin-top:3px}
+.mono{font-family:var(--mono)}
+#posBox .big{font-size:20px;font-weight:700;font-family:var(--mono)}
+.legend{position:absolute;top:8px;left:10px;z-index:3;font-family:var(--mono);font-size:12px;color:var(--muted);pointer-events:none}
+/* modal */
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+#modal.on{display:flex}
+#modal .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:1100px;width:100%;max-height:92vh;overflow:auto;padding:16px}
+#modal video,#modal img{max-width:100%;max-height:78vh;display:block;margin:auto;border-radius:8px}
+#toast{position:fixed;bottom:20px;right:20px;background:var(--panel2);border:1px solid var(--gold);padding:10px 16px;border-radius:10px;display:none;z-index:60}
+.eq{width:100%;height:220px}
+.tv{height:640px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.week{display:flex;gap:12px;padding:12px;border:1px solid var(--line);border-radius:10px;margin:6px 0;align-items:center}
+.week .n{font-family:var(--mono);color:var(--gold2);font-weight:700;width:54px}
+.week.ok{border-color:rgba(34,197,139,.5)}
+.dz{border:2px dashed var(--line);border-radius:12px;padding:20px;text-align:center}
+.dz.over{border-color:var(--gold)}
+@media (max-width:1100px){.labwrap{grid-template-columns:1fr}.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:800px){
+  body{flex-direction:column}
+  #side{width:100%;height:auto;position:static}
+  #nav{display:flex;overflow-x:auto;padding:6px}
+  #nav .sec,.sidefoot{display:none}
+  #nav a{white-space:nowrap}
+  main{height:auto}
+  .page{padding:18px 16px 50px}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  #chartBox{height:420px}
+}
+@media print{#side,.noprint{display:none}main{height:auto}.page{display:none}.page.on{display:block}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<aside id="side">
+  <div class="brand">ICT <span>Gold</span> Lab<small>Học · Backtest · Thực chiến XAUUSD</small></div>
+  <nav id="nav">
+    <a href="#home" data-p="home">🏠 Tổng quan</a>
+    <div class="sec">Học</div>
+    <a href="#chapters" data-p="chapters">📚 Các chương</a>
+    <a href="#quiz" data-p="quiz">📝 Ôn tập trắc nghiệm</a>
+    <a href="#scen" data-p="scen">🎲 Kịch bản thực chiến</a>
+    <div class="sec">Thực chiến</div>
+    <a href="#lab" data-p="lab">🕹️ Backtest Lab</a>
+    <a href="#auto" data-p="auto">⚙️ Thử nghiệm chiến lược</a>
+    <a href="#tv" data-p="tv">📈 Chart TradingView</a>
+    <a href="#journal" data-p="journal">📒 Nhật ký & thống kê</a>
+    <a href="#tools" data-p="tools">🧮 Công cụ & checklist</a>
+  </nav>
+  <div class="sidefoot">Giờ VN <span id="clock">--:--</span><br><span id="kzNow">—</span></div>
+</aside>
+
+<main>
+<!-- ================= HOME ================= -->
+<section class="page" id="p-home">
+  <h1>Chào mừng trở lại 👋</h1>
+  <p class="lead">Lộ trình: <b>Học 8 chương → Ôn tập → Backtest 50 mẫu → Demo 30 lệnh → Tiền thật lot nhỏ</b>. Mọi tiến độ được lưu trên trình duyệt này.</p>
+  <div class="grid g4" id="homeKpi"></div>
+  <h2>Lộ trình 8 tuần</h2>
+  <div id="roadmap"></div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h4>Tiếp tục học</h4><div id="nextChapter"></div></div>
+    <div class="card"><h4>Hôm nay</h4><div id="todayBox"></div></div>
+  </div>
+  <div class="note warn" style="margin-top:18px">Đây là công cụ học tập, không phải khuyến nghị đầu tư. Không phương pháp nào đảm bảo có lãi. Backtest và demo trước khi dùng tiền thật.</div>
+</section>
+
+<!-- ================= CHAPTERS ================= -->
+<section class="page" id="p-chapters">
+  <div id="chIndex">
+    <h1>Các chương</h1>
+    <p class="lead">Mỗi chương gồm: <b>Lý thuyết</b> → <b>Tài liệu</b> (PDF, video trong thư mục của bạn) → <b>Thực chiến</b> (nhiệm vụ trong Lab) → <b>Kiểm tra</b>. Hoàn thành chương khi đạt ≥ 80% bài kiểm tra và xong nhiệm vụ.</p>
+    <div class="chlist" id="chList"></div>
+  </div>
+  <div id="chView" style="display:none"></div>
+</section>
+
+<!-- ================= QUIZ ================= -->
+<section class="page" id="p-quiz">
+  <h1>Ôn tập trắc nghiệm</h1>
+  <p class="lead">Ngân hàng câu hỏi theo 8 chương. Câu sai sẽ được ưu tiên xuất hiện lại ở lần sau (chế độ "Ôn câu sai").</p>
+  <div id="quizSetup" class="card">
+    <div class="grid g3">
+      <div><label class="f">Chương</label><select id="qzCh"></select></div>
+      <div><label class="f">Số câu</label><select id="qzN"><option>10</option><option selected>15</option><option>20</option><option value="999">Tất cả</option></select></div>
+      <div><label class="f">Chế độ</label><select id="qzMode"><option value="rand">Ngẫu nhiên</option><option value="wrong">Ôn câu sai</option></select></div>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="btn pri" onclick="Quiz.start()">Bắt đầu</button><span class="muted" id="qzHist"></span></div>
+  </div>
+  <div id="quizRun" style="display:none"></div>
+</section>
+
+<!-- ================= SCENARIOS ================= -->
+<section class="page" id="p-scen">
+  <h1>Kịch bản thực chiến (24 bài)</h1>
+  <p class="lead">Lấy từ sheet <b>Bai_tap</b> / <b>Dap_an</b> trong file Excel. Đọc bối cảnh → ra quyết định → điền Entry/SL/TP → so với đáp án và kết quả thực tế của kịch bản.</p>
+  <div class="row" style="margin-bottom:12px" id="scenNav"></div>
+  <div id="scenBox"></div>
+</section>
+
+<!-- ================= LAB ================= -->
+<section class="page" id="p-lab">
+  <h1>Backtest Lab</h1>
+  <p class="lead">Nạp dữ liệu xuất từ TradingView (hoặc MT5), tua từng nến như Bar Replay, đặt lệnh, kết quả tự ghi vào nhật ký. Nến tương lai bị ẩn để không "nhìn trước".</p>
+  <div class="toolbar noprint">
+    <label class="btn pri">📂 Nạp CSV<input type="file" id="csvFile" accept=".csv,.txt" hidden></label>
+    <button class="btn" onclick="Lab.loadDemo()">Dữ liệu demo</button>
+    <button class="btn" onclick="Lab.showImportHelp()">❔ Cách xuất dữ liệu</button>
+    <span class="sep"></span>
+    <span id="tfBtns" class="row"></span>
+    <span class="sep"></span>
+    <input type="date" id="rpDate"><input type="time" id="rpTime" value="19:00" style="width:auto;background:#0e1422;border:1px solid var(--line);border-radius:8px;padding:6px"><button class="btn sm" onclick="Lab.jumpDate()">Bắt đầu từ đây</button>
+  </div>
+  <div class="toolbar noprint">
+    <button class="btn sm" title="Lùi 1 nến (←)" onclick="Lab.back()">◀</button>
+    <button class="btn sm" id="playBtn" title="Chạy / dừng (Space)" onclick="Lab.togglePlay()">▶ Chạy</button>
+    <button class="btn sm" title="Tiến 1 nến (→)" onclick="Lab.step()">▶|</button>
+    <button class="btn sm" title="Tới killzone kế tiếp" onclick="Lab.toNextKZ()">⏭ Killzone kế</button>
+    <select id="speed"><option value="600">Chậm</option><option value="250" selected>Vừa</option><option value="80">Nhanh</option><option value="15">Rất nhanh</option></select>
+    <span class="sep"></span>
+    <button class="btn sm on" id="tgKZ" onclick="Lab.toggle('kz')">Killzone</button>
+    <button class="btn sm on" id="tgLv" onclick="Lab.toggle('lv')">Mức thanh khoản</button>
+    <button class="btn sm" id="tgFvg" onclick="Lab.toggle('fvg')">FVG</button>
+    <span class="sep"></span>
+    <span id="replayInfo">Chưa có dữ liệu</span>
+  </div>
+  <div class="labwrap">
+    <div>
+      <div id="chartBox"><div class="legend" id="legend"></div><div class="empty" id="chartEmpty"><div style="font-size:40px">📈</div><div>Kéo thả file CSV vào đây, hoặc bấm <b>Nạp CSV</b> / <b>Dữ liệu demo</b>.</div><div class="muted" style="font-size:12px">Phím tắt: → tiến 1 nến · ← lùi · Space chạy/dừng · B/S chọn Mua/Bán</div></div></div>
+      <div class="row muted" style="margin-top:6px;font-size:12px" id="dataInfo"></div>
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="card ticket">
+        <h4>Đặt lệnh</h4>
+        <div class="seg" id="dirSeg"><button class="b on" data-d="1">MUA</button><button class="s" data-d="-1">BÁN</button></div>
+        <div class="row" style="margin-top:8px">
+          <div><label class="f">Loại</label><select id="ordType"><option value="limit">Limit</option><option value="market">Market</option></select></div>
+          <div><label class="f">Setup</label><select id="ordSetup"><option>A</option><option>B</option><option>C</option><option>Khác</option></select></div>
+        </div>
+        <div class="row">
+          <div><label class="f">Entry <a href="javascript:Lab.pick('entry')" title="Click trên chart">🎯</a></label><input type="number" step="0.01" id="ordEntry"></div>
+          <div><label class="f">SL <a href="javascript:Lab.pick('sl')">🎯</a></label><input type="number" step="0.01" id="ordSL"></div>
+        </div>
+        <div class="row">
+          <div><label class="f">TP <a href="javascript:Lab.pick('tp')">🎯</a></label><input type="number" step="0.01" id="ordTP"></div>
+          <div><label class="f">RR</label><input type="text" id="ordRR" readonly></div>
+        </div>
+        <div class="row">
+          <div><label class="f">Vốn ($)</label><input type="number" id="ordBal" value="1000"></div>
+          <div><label class="f">Rủi ro %</label><input type="number" id="ordRisk" value="1" step="0.1"></div>
+        </div>
+        <div class="muted" id="ordLot" style="font-size:12.5px;margin-top:6px">Lot: —</div>
+        <div class="muted" id="pickHint" style="font-size:12px;color:var(--gold2)"></div>
+        <details style="margin-top:8px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Checklist trước khi bấm lệnh (<span id="chkCount">0</span>/9)</summary><div class="chk" id="chkList"></div></details>
+        <label class="f">Ghi chú</label><textarea id="ordNote" placeholder="Mức bị quét, lý do vào..."></textarea>
+        <button class="btn pri" style="width:100%;margin-top:10px" onclick="Lab.placeOrder()">Đặt lệnh</button>
+      </div>
+      <div class="card" id="posBox"><h4>Lệnh hiện tại</h4><div class="muted">Không có lệnh.</div></div>
+      <div class="card"><h4>Phiên replay này</h4><div id="sessStats" class="muted">—</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= AUTO STRATEGY ================= -->
+<section class="page" id="p-auto">
+  <h1>Thử nghiệm chiến lược — Mô hình A tự động</h1>
+  <p class="lead">Chạy luật <b>Quét thanh khoản → MSS → FVG</b> trên dữ liệu đã nạp ở Lab. Thay đổi tham số để kiểm tra giả thuyết (VD: "chỉ NY AM có tốt hơn London không?"). Dữ liệu khuyến nghị: XAUUSD M5, ≥ 3 tháng.</p>
+  <div class="card">
+    <div class="grid g4">
+      <div><label class="f">Killzone</label><select id="stKZ"><option value="ny">NY AM (19:00–22:00 VN đông)</option><option value="ldn">London (14:00–17:00 VN đông)</option><option value="both">Cả hai</option></select></div>
+      <div><label class="f">Bắt đầu tìm sau (phút vào KZ)</label><input type="number" id="stDelay" value="30"></div>
+      <div><label class="f">Bias</label><select id="stBias"><option value="none">Không lọc</option><option value="prev">Nến D1 hôm trước</option><option value="ema">D1 so với EMA20</option></select></div>
+      <div><label class="f">Mức thanh khoản dùng để quét</label><select id="stLv"><option value="all">Á + London + PDH/PDL</option><option value="asia">Chỉ phiên Á</option><option value="pd">Chỉ PDH/PDL</option><option value="ldn">Chỉ London (cho NY)</option></select></div>
+      <div><label class="f">Lookback swing cho MSS (nến)</label><input type="number" id="stLook" value="6"></div>
+      <div><label class="f">Tối đa nến chờ MSS sau quét</label><input type="number" id="stWait" value="12"></div>
+      <div><label class="f">Entry trong FVG</label><select id="stEntry"><option value="ce">CE 50%</option><option value="edge">Mép FVG</option></select></div>
+      <div><label class="f">Đệm SL ($)</label><input type="number" id="stBuf" value="1.2" step="0.1"></div>
+      <div><label class="f">Chốt lời</label><select id="stTP"><option value="fixed">RR cố định</option><option value="split">TP1/TP2 + dời BE</option><option value="liq">Thanh khoản đối diện</option></select></div>
+      <div><label class="f">RR (TP / TP1)</label><input type="number" id="stRR" value="2" step="0.1"></div>
+      <div><label class="f">RR TP2 (chế độ chia)</label><input type="number" id="stRR2" value="4" step="0.1"></div>
+      <div><label class="f">RR tối thiểu (chế độ thanh khoản)</label><input type="number" id="stMinRR" value="2" step="0.1"></div>
+      <div><label class="f">SL tối đa ($), 0 = không giới hạn</label><input type="number" id="stMaxSL" value="12" step="0.5"></div>
+      <div><label class="f">Displacement: thân nến MSS ≥ × thân TB</label><input type="number" id="stDisp" value="1.3" step="0.1"></div>
+      <div><label class="f">Đóng lệnh muộn nhất (giờ NY)</label><input type="number" id="stExit" value="12.5" step="0.5"></div>
+      <div><label class="f">Chi phí mỗi lệnh (spread, $)</label><input type="number" id="stCost" value="0.3" step="0.1"></div>
+    </div>
+    <div class="row" style="margin-top:14px"><button class="btn pri" onclick="Strat.run()">▶ Chạy backtest</button><button class="btn" onclick="Strat.reset()">Mặc định</button><button class="btn" onclick="Strat.toJournal()">Chép kết quả vào nhật ký</button><span class="muted" id="stInfo"></span></div>
+  </div>
+  <div id="stOut"></div>
+</section>
+
+<!-- ================= TRADINGVIEW ================= -->
+<section class="page" id="p-tv">
+  <h1>Chart TradingView</h1>
+  <p class="lead">Chart trực tiếp để phân tích hằng ngày. Để backtest có ẩn nến tương lai, dùng nút <b>Replay</b> ngay trên TradingView.com hoặc Backtest Lab ở đây.</p>
+  <div class="row" style="margin-bottom:10px">
+    <input type="text" id="tvSym" value="OANDA:XAUUSD" style="width:200px">
+    <select id="tvInt" style="width:auto"><option value="1">M1</option><option value="5" selected>M5</option><option value="15">M15</option><option value="60">H1</option><option value="240">H4</option><option value="D">D1</option></select>
+    <button class="btn pri" onclick="TV.load()">Mở</button>
+    <a class="btn" href="https://www.tradingview.com/chart/?symbol=OANDA%3AXAUUSD" target="_blank" rel="noopener">Mở trên TradingView.com ↗</a>
+  </div>
+  <div class="tv" id="tvBox"><div class="muted" style="padding:20px">Bấm "Mở" để tải chart (cần Internet).</div></div>
+</section>
+
+<!-- ================= JOURNAL ================= -->
+<section class="page" id="p-journal">
+  <h1>Nhật ký & thống kê</h1>
+  <p class="lead">Lệnh từ Backtest Lab tự ghi vào đây. Bạn cũng có thể thêm lệnh demo/thật bằng tay.</p>
+  <div class="row noprint" style="margin-bottom:12px">
+    <select id="jSrc" style="width:auto" onchange="Journal.render()"><option value="all">Tất cả nguồn</option><option value="replay">Backtest Lab</option><option value="auto">Chiến lược tự động</option><option value="demo">Demo</option><option value="real">Tiền thật</option></select>
+    <select id="jSetup" style="width:auto" onchange="Journal.render()"><option value="all">Mọi setup</option><option>A</option><option>B</option><option>C</option><option>Khác</option></select>
+    <button class="btn" onclick="Journal.addForm()">+ Thêm lệnh tay</button>
+    <button class="btn" onclick="Journal.exportCSV()">⬇ Xuất CSV</button>
+    <button class="btn" onclick="Store.backup()">💾 Sao lưu toàn bộ</button>
+    <label class="btn">♻ Khôi phục<input type="file" accept=".json" hidden onchange="Store.restore(this.files[0])"></label>
+    <button class="btn" onclick="Journal.clear()">🗑 Xóa theo bộ lọc</button>
+  </div>
+  <div id="jForm"></div>
+  <div class="grid g4" id="jKpi"></div>
+  <div class="card" style="margin-top:14px"><h4>Đường vốn (R tích lũy)</h4><svg class="eq" id="jEq"></svg></div>
+  <div class="grid g2" style="margin-top:14px"><div class="card"><h4>Theo setup</h4><div id="jBySetup"></div></div><div class="card"><h4>Theo tuân thủ checklist</h4><div id="jByComp"></div></div></div>
+  <h2>Danh sách lệnh</h2>
+  <div class="tblwrap"><table class="tbl" id="jTbl"></table></div>
+</section>
+
+<!-- ================= TOOLS ================= -->
+<section class="page" id="p-tools">
+  <h1>Công cụ & checklist</h1>
+  <div class="grid g2">
+    <div class="card"><h4>🧮 Máy tính lot XAUUSD</h4>
+      <div class="grid g2"><div><label class="f">Vốn ($)</label><input type="number" id="lcBal" value="1000"></div><div><label class="f">Rủi ro %</label><input type="number" id="lcRisk" value="1" step="0.1"></div>
+      <div><label class="f">Entry</label><input type="number" id="lcE" step="0.01" placeholder="tuỳ chọn"></div><div><label class="f">SL (giá) hoặc để trống</label><input type="number" id="lcS" step="0.01"></div>
+      <div><label class="f">Khoảng cách SL ($)</label><input type="number" id="lcD" value="6" step="0.1"></div><div><label class="f">Hợp đồng (oz / lot)</label><input type="number" id="lcC" value="100"></div></div>
+      <div id="lcOut" style="margin-top:12px"></div></div>
+    <div class="card"><h4>🕐 Giờ phiên hôm nay (tự động theo mùa)</h4><div id="sessTbl"></div>
+      <label class="f">Đổi giờ server MT5 → giờ VN</label><div class="row"><input type="time" id="srvT" value="14:30" style="width:auto;background:#0e1422;border:1px solid var(--line);border-radius:8px;padding:6px"><span id="srvOut" class="mono"></span></div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><div class="row" style="justify-content:space-between"><h4>✅ Checklist in ra dán cạnh màn hình</h4><button class="btn sm noprint" onclick="window.print()">🖨 In</button></div>
+<pre class="flow">TRƯỚC 19:15
+[ ] Bias D1/H4: MUA / BÁN / ĐỨNG NGOÀI
+[ ] Đã kẻ: PDH, PDL, đỉnh/đáy Á, đỉnh/đáy London, Midnight Open
+[ ] Đã xem lịch tin 20:30 / 22:00 / 02:00
+[ ] Đã đặt cảnh báo giá
+
+TRƯỚC KHI BẤM LỆNH
+[ ] Đang trong 19:30–22:00 (hoặc 14:00–16:30)
+[ ] Có cú QUÉT thanh khoản rõ ràng (tên mức: ________)
+[ ] Có DISPLACEMENT + MSS đóng cửa qua đỉnh/đáy
+[ ] Có FVG/OB chưa bị chạm, vào bằng lệnh LIMIT
+[ ] Cùng hướng bias D1 / đúng Premium-Discount
+[ ] SL sau râu quét + 1–1.5$ đệm
+[ ] TP tại thanh khoản đối diện, RR ≥ 2
+[ ] Lot = rủi ro / (SL × 100), làm tròn xuống
+[ ] Hôm nay chưa có lệnh nào, tuần chưa -3R
+→ Thiếu 1 ô = KHÔNG VÀO</pre></div>
+</section>
+</main>
+
+<div id="modal" onclick="if(event.target===this)UI.close()"><div class="box"><div class="row" style="justify-content:space-between;margin-bottom:10px"><b id="mTitle"></b><button class="btn sm" onclick="UI.close()">✕ Đóng</button></div><div id="mBody"></div></div></div>
+<div id="toast"></div>
+
+<script src="content.js"></script>
+<script src="scenarios.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

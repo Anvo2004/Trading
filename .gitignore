@@ -1,0 +1,5 @@
+# Tài liệu gốc: dung lượng lớn (video >100MB) và có bản quyền -> chỉ giữ trên máy
+Documents/
+*.mp4
+desktop.ini
+Thumbs.db

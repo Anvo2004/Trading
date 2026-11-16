@@ -17,11 +17,13 @@ window.CHAPTERS = [
     <li><b>Xu hướng giảm:</b> đỉnh thấp hơn (<b>LH</b>) + đáy thấp hơn (<b>LL</b>).</li>
     <li>Chỉ tính đỉnh/đáy "rõ ràng" (swing), tức có ít nhất 2 nến thấp hơn/cao hơn ở mỗi bên.</li>
   </ul>
+  <div class="figrow"><div data-fig="trendUp" data-cap="Xu hướng tăng: mỗi đỉnh (HH) và mỗi đáy (HL) đều cao hơn cái trước"></div><div data-fig="trendDown" data-cap="Xu hướng giảm: đỉnh thấp dần (LH), đáy thấp dần (LL)"></div></div>
   <h3>2. BOS và MSS</h3>
   <table class="tbl"><tr><th></th><th>BOS — Break of Structure</th><th>MSS / CHoCH — Market Structure Shift</th></tr>
   <tr><td>Hướng phá</td><td>Cùng xu hướng</td><td><b>Ngược</b> xu hướng ngắn hạn</td></tr>
   <tr><td>Ý nghĩa</td><td>Xu hướng tiếp diễn</td><td>Tín hiệu đảo chiều ở khung nhỏ</td></tr>
   <tr><td>Điều kiện tốt</td><td>Nến đóng cửa qua đỉnh/đáy</td><td>Nến <b>thân lớn</b> đóng cửa qua đỉnh/đáy, thường để lại FVG</td></tr></table>
+  <div class="figrow"><div data-fig="bos" data-cap="BOS: mỗi lần giá đóng cửa vượt đỉnh cũ theo chiều tăng, xu hướng tiếp diễn"></div><div data-fig="mss" data-cap="MSS: sau khi quét đáy, nến thân dài (tô cam) đóng cửa trên đỉnh LH gần nhất, để lại FVG"></div></div>
   <div class="note warn">HLZ nhấn mạnh: <b>phá cấu trúc chưa phải là điểm vào lệnh</b>. Đó chỉ là tín hiệu sớm. Điểm vào là khi giá <b>hồi lại</b> vùng FVG/OB do nhịp phá để lại.</div>
   <h3>3. Đa khung thời gian (HTF → LTF)</h3>
   <p>D1/H4 cho <b>bias</b> (hướng ưu tiên) → H1/M15 vẽ <b>bản đồ thanh khoản</b> → M5/M1 tìm <b>trigger</b>. Không bao giờ vào lệnh M5 mà chưa biết D1 đang làm gì.</p>
@@ -59,6 +61,7 @@ window.CHAPTERS = [
   <tr><td>Đỉnh/đáy tuần trước, đỉnh/đáy bằng nhau rõ ràng trên H1</td><td>—</td></tr></table>
   <h3>4. Sweep (quét) ≠ entry</h3>
   <p>Sweep là khi giá xuyên qua mức đó bằng râu hoặc vài nến rồi quay lại. Tài liệu Quản trị rủi ro: <i>"Một liquidity sweep không phải entry"</i>. Cần thêm <b>displacement + MSS</b> (chương 3, 6).</p>
+  <div class="figrow"><div data-fig="sweepSSL" data-cap="Đáy bằng nhau gom stop phe mua (SSL). Nến tô cam quét xuống rồi đóng cửa quay lại, sau đó giá tăng mạnh"></div><div data-fig="bsl" data-cap="Ngược lại: đỉnh bằng nhau gom stop phe bán (BSL), bị quét rồi giá giảm"></div></div>
   <h3>5. Vì sao giá cần thanh khoản?</h3>
   <p>Tổ chức lớn cần khối lượng đối ứng để khớp lệnh lớn. Stop-loss của phe mua (lệnh bán) nằm dưới đáy là nguồn đối ứng hoàn hảo cho lệnh <b>mua</b> lớn. Vì vậy cú quét đáy thường đi trước một nhịp tăng.</p>
   <p class="muted">HLZ và Bẫy giá (Ray Wang) mô tả cùng hiện tượng dưới tên "bẫy giá", "Quasimodo / Over-Under".</p>`,
@@ -88,6 +91,8 @@ window.CHAPTERS = [
   <tr><td><b>Order Block</b></td><td>Cây nến ngược màu cuối cùng trước nhịp displacement</td><td>Giá hồi về OB thì vào, SL ngoài OB</td></tr>
   <tr><td><b>IFVG</b></td><td>FVG bị giá đóng cửa xuyên qua và đổi vai trò (hỗ trợ ↔ kháng cự)</td><td>Rất hay gặp ở vàng sau cú quét</td></tr>
   <tr><td><b>Breaker</b></td><td>OB bị phá, đổi vai trò</td><td>Giống "Flippy" của HLZ</td></tr></table>
+  <div class="figrow"><div data-fig="fvgBull" data-cap="FVG tăng: râu dưới nến 3 cao hơn râu trên nến 1. Giá hồi về CE (50%) rồi tăng tiếp"></div><div data-fig="fvgBear" data-cap="FVG giảm: vào lệnh Sell limit khi giá hồi lên CE"></div></div>
+  <div class="figrow"><div data-fig="ob" data-cap="Order Block tăng: nến giảm cuối cùng (tô cam) trước nhịp displacement"></div><div data-fig="ifvg" data-cap="IFVG: FVG giảm bị đóng cửa xuyên lên, sau đó trở thành hỗ trợ"></div></div>
   <h3>3. Đối chiếu HLZ ↔ ICT</h3>
   <ul>
     <li>Base / SGB ≈ <b>Order Block</b> · SDE ≈ <b>MSS bằng displacement</b></li>
@@ -118,6 +123,7 @@ window.CHAPTERS = [
   <p>Kéo Fibo từ đáy đến đỉnh của nhịp vừa tạo. <b>Trên 50%</b> là Premium (đắt, ưu tiên bán), <b>dưới 50%</b> là Discount (rẻ, ưu tiên mua).</p>
   <h3>2. OTE — Optimal Trade Entry</h3>
   <p>Chỉ bật 3 mức <b>0.5, 0.618, 0.786</b>. Chờ giá vào vùng này <b>và có phản ứng</b> (theo ảnh "Cách sử dụng Fibo").</p>
+  <div data-fig="fibOTE" data-cap="Kéo Fibo từ đáy lên đỉnh nhịp tăng. Vùng xanh = OTE 0.618–0.786 nằm trong Discount; nền đỏ nhạt = Premium"></div>
   <div class="note">Lệnh mua đẹp nhất: FVG/OB nằm <b>trong Discount</b> và trùng vùng OTE. Lệnh bán đẹp nhất: FVG/OB trong Premium, trùng OTE.</div>
   <h3>3. Midnight Open</h3>
   <p>Giá mở cửa lúc 00:00 New York (<b>12:00 VN mùa đông</b>) là mức tham chiếu trong ngày: trên mức này là Premium, dưới là Discount của ngày.</p>
@@ -151,9 +157,11 @@ window.CHAPTERS = [
   <pre class="flow">Tích lũy (Á) → Thao túng / Judas Swing (đầu London) → Mở rộng (London)
 → Tích lũy giữa giờ → Hồi (8:00–8:30 NY) → Đảo chiều hoặc Mở rộng (phiên Mỹ)
 → Đảo chiều (10–11h NY, London close) → Tích lũy cuối ngày</pre>
+  <div data-fig="judas" data-cap="Phiên Á đi ngang tạo đỉnh/đáy → đầu London quét đáy Á (Judas swing) → giá mở rộng tăng mạnh. Giờ VN mùa đông"></div>
   <ul><li><b>Judas Swing:</b> cú chạy giả quét một phía range Á, thường kèm tin.</li><li><b>Phiên Mỹ:</b> hoặc tiếp diễn hướng London sau nhịp hồi, hoặc đảo chiều sau khi quét đỉnh/đáy London.</li></ul>
   <h3>3. CRT — Candle Range Theory</h3>
-  <ol><li>Lấy nến khung lớn (D1/H4): đỉnh = CRTH, đáy = CRTL.</li><li>Nến tiếp theo quét qua CRTH/CRTL rồi <b>đóng cửa quay lại trong range</b> (Turtle Soup).</li><li>Xuống khung nhỏ chờ phá cấu trúc ngược lại → vào lệnh.</li><li>Mục tiêu: 50% range, sau đó phía đối diện.</li></ol>`,
+  <ol><li>Lấy nến khung lớn (D1/H4): đỉnh = CRTH, đáy = CRTL.</li><li>Nến tiếp theo quét qua CRTH/CRTL rồi <b>đóng cửa quay lại trong range</b> (Turtle Soup).</li><li>Xuống khung nhỏ chờ phá cấu trúc ngược lại → vào lệnh.</li><li>Mục tiêu: 50% range, sau đó phía đối diện.</li></ol>
+  <div data-fig="crt" data-cap="CRT khung H4: nến 2 quét CRTH rồi đóng cửa vào lại range → giá về 50% rồi về CRTL"></div>`,
   res: [
     { t: 'ICT IPDA Market Cycle (bản dịch tiếng Việt)', p: D + 'ICT_IPDA_Market_Cycle_Ban_Dich_Tieng_Viet.pdf', k: 'pdf' },
     { t: 'ICT IPDA Market Cycle (bản gốc)', p: D + 'ict_ipda_market_cycle_thread_by_liq_sniper_jan_18,_2024_from_rattibha.pdf', k: 'pdf' },
@@ -182,6 +190,7 @@ window.CHAPTERS = [
     <li><b>TP1</b> đỉnh thanh khoản gần nhất (≥ 2R). <b>TP2</b> PDH hoặc FVG H1 đối diện.</li>
     <li><b>Hủy lệnh chờ</b> nếu giá chạm TP1 trước khi khớp, hoặc qua 22:00 chưa khớp.</li>
   </ol>
+  <div data-fig="modelA" data-cap="Kịch bản 1 (file Excel) dựng thành chart M5: quét Đáy London 20:31 → MSS 20:50 để lại FVG → khớp ở CE lúc 21:05 → chạm TP1 rồi TP2 (+2.93R)"></div>
   <pre class="flow">                                         TP1 (đỉnh London)
         ┌─┐                                ↑
  ───────┤ ├──── đỉnh nhỏ ────────── MSS ──┼──────
@@ -300,29 +309,29 @@ Ví dụ: thắng 40%, R thắng TB 2.5 → 0.4×2.5 − 0.6×1 = +0.4R / lệnh
 // =====================================================================
 window.QUESTIONS = [
 // ---- Chương 1
-{c:1,q:'Xu hướng tăng được xác định bởi:',o:['Đỉnh thấp hơn và đáy thấp hơn','Đỉnh cao hơn (HH) và đáy cao hơn (HL)','Giá nằm trên đường MA 20','Nến xanh nhiều hơn nến đỏ'],a:1,e:'Cấu trúc tăng = chuỗi HH + HL. Chỉ báo chỉ là phụ.'},
-{c:1,q:'BOS (Break of Structure) nghĩa là:',o:['Giá phá đỉnh/đáy theo cùng xu hướng → tiếp diễn','Giá phá cấu trúc ngược xu hướng → đảo chiều','Giá đi ngang','Giá quét thanh khoản'],a:0,e:'BOS = phá cùng chiều, xu hướng tiếp diễn. Phá ngược chiều là MSS/CHoCH.'},
-{c:1,q:'Một MSS chất lượng cao thường có đặc điểm nào?',o:['Râu nến chạm qua đỉnh nhưng đóng cửa bên dưới','Nến thân lớn đóng cửa qua đỉnh/đáy và để lại FVG','Xảy ra trong phiên Á','Có 2 nến doji liên tiếp'],a:1,e:'MSS cần displacement: thân lớn, đóng cửa qua mức cấu trúc, thường để lại FVG.'},
+{eimg:'trendUp',c:1,q:'Xu hướng tăng được xác định bởi:',o:['Đỉnh thấp hơn và đáy thấp hơn','Đỉnh cao hơn (HH) và đáy cao hơn (HL)','Giá nằm trên đường MA 20','Nến xanh nhiều hơn nến đỏ'],a:1,e:'Cấu trúc tăng = chuỗi HH + HL. Chỉ báo chỉ là phụ.'},
+{eimg:'bos',c:1,q:'BOS (Break of Structure) nghĩa là:',o:['Giá phá đỉnh/đáy theo cùng xu hướng → tiếp diễn','Giá phá cấu trúc ngược xu hướng → đảo chiều','Giá đi ngang','Giá quét thanh khoản'],a:0,e:'BOS = phá cùng chiều, xu hướng tiếp diễn. Phá ngược chiều là MSS/CHoCH.'},
+{eimg:'mss',c:1,q:'Một MSS chất lượng cao thường có đặc điểm nào?',o:['Râu nến chạm qua đỉnh nhưng đóng cửa bên dưới','Nến thân lớn đóng cửa qua đỉnh/đáy và để lại FVG','Xảy ra trong phiên Á','Có 2 nến doji liên tiếp'],a:1,e:'MSS cần displacement: thân lớn, đóng cửa qua mức cấu trúc, thường để lại FVG.'},
 {c:1,q:'Theo HLZ, khi thấy giá phá cấu trúc, bạn nên:',o:['Vào lệnh ngay bằng lệnh market','Coi đó là tín hiệu sớm, chờ giá hồi về vùng FVG/OB để vào','Đóng hết lệnh','Bỏ qua vì phá cấu trúc luôn là bẫy'],a:1,e:'"Phá cấu trúc chưa phải điểm vào lệnh" — điểm vào là khi giá hồi lại.'},
 {c:1,q:'Trong playbook XAUUSD, khung dùng để xác định bias là:',o:['M1 và M5','M15','D1 và H4','Tuần và tháng'],a:2,e:'D1 + H4 cho bias, H1/M15 bản đồ thanh khoản, M5 vào lệnh.'},
-{c:1,q:'Xu hướng giảm có cấu trúc:',o:['HH + HL','LH + LL','HH + LL','LH + HL'],a:1,e:'Giảm = đỉnh thấp hơn (LH) và đáy thấp hơn (LL).'},
+{eimg:'trendDown',c:1,q:'Xu hướng giảm có cấu trúc:',o:['HH + HL','LH + LL','HH + LL','LH + HL'],a:1,e:'Giảm = đỉnh thấp hơn (LH) và đáy thấp hơn (LL).'},
 // ---- Chương 2
-{c:2,q:'Buy-side liquidity (BSL) nằm ở đâu?',o:['Dưới các đáy cũ','Trên các đỉnh cũ / đỉnh bằng nhau','Ở giữa range','Tại đường MA'],a:1,e:'BSL = stop của phe bán (lệnh mua) nằm trên đỉnh cũ.'},
-{c:2,q:'Stop-loss của phe MUA nằm ở đâu?',o:['Trên đỉnh cũ (BSL)','Dưới đáy cũ (SSL)','Tại giá mở cửa ngày','Không xác định được'],a:1,e:'Người mua đặt SL dưới đáy → tạo sell-side liquidity (SSL).'},
+{eimg:'bsl',c:2,q:'Buy-side liquidity (BSL) nằm ở đâu?',o:['Dưới các đáy cũ','Trên các đỉnh cũ / đỉnh bằng nhau','Ở giữa range','Tại đường MA'],a:1,e:'BSL = stop của phe bán (lệnh mua) nằm trên đỉnh cũ.'},
+{eimg:'sweepSSL',c:2,q:'Stop-loss của phe MUA nằm ở đâu?',o:['Trên đỉnh cũ (BSL)','Dưới đáy cũ (SSL)','Tại giá mở cửa ngày','Không xác định được'],a:1,e:'Người mua đặt SL dưới đáy → tạo sell-side liquidity (SSL).'},
 {c:2,q:'"PDH" là viết tắt của:',o:['Previous Day High — đỉnh ngày hôm trước','Price Delivery High','Premium Discount High','Pivot Daily High'],a:0,e:'PDH/PDL = đỉnh/đáy ngày hôm trước, mức thanh khoản quan trọng.'},
-{c:2,q:'Giá vừa quét qua đáy phiên Á bằng một râu dài rồi đóng cửa quay lên. Bạn nên làm gì?',o:['Mua ngay lập tức','Bán vì đáy đã bị phá','Chờ displacement + MSS và FVG rồi mới tìm điểm vào','Không quan tâm'],a:2,e:'"Một liquidity sweep không phải entry." Cần bằng chứng displacement + MSS.'},
+{eimg:'sweepSSL',c:2,q:'Giá vừa quét qua đáy phiên Á bằng một râu dài rồi đóng cửa quay lên. Bạn nên làm gì?',o:['Mua ngay lập tức','Bán vì đáy đã bị phá','Chờ displacement + MSS và FVG rồi mới tìm điểm vào','Không quan tâm'],a:2,e:'"Một liquidity sweep không phải entry." Cần bằng chứng displacement + MSS.'},
 {c:2,q:'Vì sao giá thường quét đáy trước khi tăng mạnh?',o:['Do ngẫu nhiên','Tổ chức lớn cần thanh khoản (lệnh bán từ SL của phe mua) để khớp lệnh mua lớn','Vì chỉ báo RSI quá bán','Vì sàn muốn săn SL của bạn'],a:1,e:'"SL của bạn là entry của big boys" — stop tạo khối lượng đối ứng.'},
 {c:2,q:'Range phiên Á (giờ VN mùa đông) là:',o:['08:00 – 12:00','14:00 – 17:00','19:00 – 22:00','00:00 – 04:00'],a:0,e:'Phiên Á ICT = 20:00–00:00 NY = 08:00–12:00 VN mùa đông.'},
 // ---- Chương 3
-{c:3,q:'FVG tăng (bullish FVG) được xác định khi:',o:['High nến 3 < Low nến 1','Low nến 3 > High nến 1','Nến 2 là doji','Close nến 3 > Open nến 1'],a:1,e:'Khoảng trống giữa râu trên nến 1 và râu dưới nến 3: Low[3] > High[1].'},
-{c:3,q:'CE của FVG là:',o:['Mép trên FVG','Điểm giữa 50% của FVG','Mép dưới FVG','Giá đóng cửa nến 2'],a:1,e:'CE (Consequent Encroachment) = 50% của FVG, điểm vào phổ biến.'},
-{c:3,q:'Order Block tăng là:',o:['Nến tăng cuối cùng trước nhịp giảm','Nến giảm (ngược màu) cuối cùng trước nhịp displacement tăng','Nến có khối lượng lớn nhất','Vùng đi ngang trong phiên Á'],a:1,e:'OB = nến ngược màu cuối cùng trước displacement.'},
-{c:3,q:'IFVG (FVG đảo ngược) là:',o:['FVG chưa bị chạm','FVG bị giá đóng cửa xuyên qua và đổi vai trò hỗ trợ ↔ kháng cự','FVG trên khung D1','FVG có kích thước lớn'],a:1,e:'FVG bị phá bằng giá đóng cửa sẽ đổi vai trò — rất hay gặp ở vàng.'},
+{eimg:'fvgBull',c:3,q:'FVG tăng (bullish FVG) được xác định khi:',o:['High nến 3 < Low nến 1','Low nến 3 > High nến 1','Nến 2 là doji','Close nến 3 > Open nến 1'],a:1,e:'Khoảng trống giữa râu trên nến 1 và râu dưới nến 3: Low[3] > High[1].'},
+{eimg:'fvgBull',c:3,q:'CE của FVG là:',o:['Mép trên FVG','Điểm giữa 50% của FVG','Mép dưới FVG','Giá đóng cửa nến 2'],a:1,e:'CE (Consequent Encroachment) = 50% của FVG, điểm vào phổ biến.'},
+{eimg:'ob',c:3,q:'Order Block tăng là:',o:['Nến tăng cuối cùng trước nhịp giảm','Nến giảm (ngược màu) cuối cùng trước nhịp displacement tăng','Nến có khối lượng lớn nhất','Vùng đi ngang trong phiên Á'],a:1,e:'OB = nến ngược màu cuối cùng trước displacement.'},
+{eimg:'ifvg',c:3,q:'IFVG (FVG đảo ngược) là:',o:['FVG chưa bị chạm','FVG bị giá đóng cửa xuyên qua và đổi vai trò hỗ trợ ↔ kháng cự','FVG trên khung D1','FVG có kích thước lớn'],a:1,e:'FVG bị phá bằng giá đóng cửa sẽ đổi vai trò — rất hay gặp ở vàng.'},
 {c:3,q:'Theo HLZ (FTB), một FVG/OB đã bị giá chạm một lần thì:',o:['Càng mạnh hơn','Không trade lại vùng đó','Chỉ trade bằng lot lớn','Trade ngược chiều'],a:1,e:'ICT/HLZ: chỉ dùng lần chạm đầu tiên. Sau FTB không trade lại.'},
 {c:3,q:'Displacement là:',o:['Giá đi ngang chậm','Nhịp di chuyển mạnh, nến thân dài, đi một mạch, thường để lại FVG','Khoảng trống cuối tuần','Một cú quét râu'],a:1,e:'Displacement là "dấu chân" của dòng tiền lớn.'},
 // ---- Chương 4
-{c:4,q:'Các mức Fibo của vùng OTE là:',o:['0.236 / 0.382','0.5 / 0.618 / 0.786','1.0 / 1.272 / 1.618','0.1 / 0.9'],a:1,e:'OTE: bật 0.5, 0.618, 0.786.'},
-{c:4,q:'Trong một nhịp tăng, vùng Discount là:',o:['Trên 50% Fibo','Dưới 50% Fibo','Trên đỉnh','Bất kỳ đâu'],a:1,e:'Dưới 50% = rẻ = Discount, ưu tiên mua.'},
+{eimg:'fibOTE',c:4,q:'Các mức Fibo của vùng OTE là:',o:['0.236 / 0.382','0.5 / 0.618 / 0.786','1.0 / 1.272 / 1.618','0.1 / 0.9'],a:1,e:'OTE: bật 0.5, 0.618, 0.786.'},
+{eimg:'fibOTE',c:4,q:'Trong một nhịp tăng, vùng Discount là:',o:['Trên 50% Fibo','Dưới 50% Fibo','Trên đỉnh','Bất kỳ đâu'],a:1,e:'Dưới 50% = rẻ = Discount, ưu tiên mua.'},
 {c:4,q:'Lệnh MUA đẹp nhất theo ICT có FVG/OB nằm ở:',o:['Premium, trên 0.786','Discount, trùng vùng OTE','Ngay tại đỉnh','Giữa range phiên Á'],a:1,e:'Mua ở Discount + OTE + PD array = hợp lưu tốt nhất.'},
 {c:4,q:'Midnight Open (giờ VN mùa đông) là lúc:',o:['00:00','07:00','12:00','19:30'],a:2,e:'00:00 New York = 12:00 VN mùa đông.'},
 {c:4,q:'Giá chạm 0.618 trong nhịp hồi. Bạn nên:',o:['Vào lệnh ngay','Chờ phản ứng và MSS khung nhỏ theo hướng xu hướng','Đặt lệnh ngược xu hướng','Dời Fibo cho đẹp hơn'],a:1,e:'OTE là vùng, cần phản ứng + MSS M5 (Mô hình B).'},
@@ -330,15 +339,15 @@ window.QUESTIONS = [
 {c:5,q:'NY AM Killzone theo giờ VN mùa đông là:',o:['14:00 – 17:00','19:00 – 22:00','08:00 – 12:00','22:00 – 00:00'],a:1,e:'07:00–10:00 NY = 19:00–22:00 VN mùa đông. Playbook dùng 19:30–22:00.'},
 {c:5,q:'London Killzone theo giờ VN mùa HÈ là:',o:['13:00 – 16:00','14:00 – 17:00','15:00 – 18:00','12:00 – 15:00'],a:0,e:'Mùa hè trừ 1 tiếng so với mùa đông (14:00–17:00 → 13:00–16:00).'},
 {c:5,q:'Tin Mỹ (CPI, NFP) lúc 08:30 NY tương ứng giờ VN mùa đông:',o:['19:30','20:30','21:30','22:30'],a:1,e:'08:30 NY + 12h = 20:30 VN mùa đông.'},
-{c:5,q:'Judas Swing là:',o:['Nhịp tăng cuối ngày','Cú chạy giả quét một phía range Á trước khi giá chạy thật','Nến doji ở phiên Á','Khoảng trống mở cửa tuần'],a:1,e:'Judas Swing = thao túng (Manipulation) trong Power of 3.'},
+{eimg:'judas',c:5,q:'Judas Swing là:',o:['Nhịp tăng cuối ngày','Cú chạy giả quét một phía range Á trước khi giá chạy thật','Nến doji ở phiên Á','Khoảng trống mở cửa tuần'],a:1,e:'Judas Swing = thao túng (Manipulation) trong Power of 3.'},
 {c:5,q:'Trên MT5 với giờ server GMT+2 (mùa đông), nến server 14:30 là mấy giờ VN?',o:['16:30','19:30','21:30','09:30'],a:1,e:'Giờ VN = server + 5 (mùa đông).'},
-{c:5,q:'Trong CRT, sau khi nến quét CRTH rồi đóng cửa quay lại trong range, mục tiêu đầu tiên là:',o:['Đỉnh mới','50% của range','Đáy tuần','Không có mục tiêu'],a:1,e:'Mục tiêu CRT: 50% range trước, sau đó phía đối diện.'},
+{eimg:'crt',c:5,q:'Trong CRT, sau khi nến quét CRTH rồi đóng cửa quay lại trong range, mục tiêu đầu tiên là:',o:['Đỉnh mới','50% của range','Đáy tuần','Không có mục tiêu'],a:1,e:'Mục tiêu CRT: 50% range trước, sau đó phía đối diện.'},
 {c:5,q:'Phiên Á trong playbook được dùng để:',o:['Vào lệnh nhiều nhất','Đánh dấu đỉnh/đáy làm mục tiêu thanh khoản, không trade','Đánh tin','Nhồi lệnh'],a:1,e:'Phiên Á tích lũy, dễ bị quét hai đầu → chỉ đánh dấu.'},
 // ---- Chương 6
-{c:6,q:'Thứ tự đúng của Mô hình A là:',o:['FVG → Quét → MSS','Quét thanh khoản → Displacement + MSS → Vào lệnh khi hồi về FVG','MSS → Quét → Market order','Vào lệnh → chờ quét'],a:1,e:'Quét → MSS → FVG.'},
-{c:6,q:'SL của lệnh MUA Mô hình A đặt ở:',o:['Dưới mép dưới FVG','Dưới râu của cú quét + 1–1.5$ đệm','Cố định 70$','Không cần SL'],a:1,e:'SL ở nơi ý tưởng sai: nếu giá xuống lại dưới đáy quét thì cú quét là thật.'},
+{eimg:'modelA',c:6,q:'Thứ tự đúng của Mô hình A là:',o:['FVG → Quét → MSS','Quét thanh khoản → Displacement + MSS → Vào lệnh khi hồi về FVG','MSS → Quét → Market order','Vào lệnh → chờ quét'],a:1,e:'Quét → MSS → FVG.'},
+{eimg:'modelA',c:6,q:'SL của lệnh MUA Mô hình A đặt ở:',o:['Dưới mép dưới FVG','Dưới râu của cú quét + 1–1.5$ đệm','Cố định 70$','Không cần SL'],a:1,e:'SL ở nơi ý tưởng sai: nếu giá xuống lại dưới đáy quét thì cú quét là thật.'},
 {c:6,q:'Lệnh chờ Buy Limit tại FVG chưa khớp nhưng giá đã chạy tới TP1. Bạn:',o:['Đuổi theo bằng market','Hủy lệnh chờ','Dời entry lên cao hơn','Nhân đôi lot'],a:1,e:'Bước 8: hủy nếu giá chạm TP1 trước khi khớp, hoặc qua 22:00.'},
-{c:6,q:'Setup đủ đẹp nhưng RR chỉ 1.5 sau khi đặt SL đúng chỗ. Bạn:',o:['Thu nhỏ SL để RR thành 2','Bỏ lệnh','Vào với lot gấp đôi','Dời TP xa hơn tùy ý'],a:1,e:'RR < 2 → bỏ. Không bóp SL sai chỗ để làm đẹp RR.'},
+{eimg:'scen12:full',c:6,q:'Setup đủ đẹp nhưng RR chỉ 1.5 sau khi đặt SL đúng chỗ. Bạn:',o:['Thu nhỏ SL để RR thành 2','Bỏ lệnh','Vào với lot gấp đôi','Dời TP xa hơn tùy ý'],a:1,e:'RR < 2 → bỏ. Không bóp SL sai chỗ để làm đẹp RR.'},
 {c:6,q:'Mô hình B (tiếp diễn OTE) dùng khi nào?',o:['Phiên Á đi ngang','London đã chạy mạnh một chiều trùng bias D1, NY hồi về OTE','Trước tin FOMC','Khi đã thua 3 lệnh'],a:1,e:'IPDA: phiên NY thường "Retracement rồi Expansion" tiếp hướng London.'},
 {c:6,q:'Điều nào sau đây KHÔNG phải lý do bỏ lệnh?',o:['Ngoài killzone','FVG đã bị chạm một lần','Có cú quét rõ + MSS + FVG chưa chạm, cùng bias, RR 2.5','Trong 15 phút quanh tin đỏ'],a:2,e:'Đó chính là setup A+ đủ điều kiện.'},
 {c:6,q:'"3 điều cho một setup A+" gồm:',o:['RSI, MACD, MA','Context (bias + Premium/Discount), Thanh khoản bị quét trong killzone, Xác nhận displacement + MSS','Tin tức, lot lớn, SL rộng','Nhiều lệnh, nhiều cặp, nhiều khung'],a:1,e:'Context → Liquidity → Confirmation.'},
@@ -358,4 +367,23 @@ window.QUESTIONS = [
 {c:8,q:'"Nhìn trước tương lai" khi backtest là:',o:['Dự báo tốt','Lỡ thấy nến sau rồi mới quyết định → kết quả ảo','Dùng nhiều khung thời gian','Đọc tin tức'],a:1,e:'Bar Replay / Lab ẩn nến tương lai để tránh lỗi này.'},
 {c:8,q:'Sau 50 mẫu backtest kỳ vọng ≤ 0. Bạn nên:',o:['Vào tiền thật để thử','Không vào tiền thật; xem lại bộ lọc, khung giờ','Tăng rủi ro lên 5%','Bỏ nhật ký'],a:1,e:'Số liệu nói hệ thống chưa có lợi thế với cách bạn thực hiện.'},
 {c:8,q:'Rủi ro khi vào tiền thật lần đầu theo lộ trình:',o:['0.5% (hoặc tài khoản cent)','2%','5%','10%'],a:0,e:'Bắt đầu 0.5%, giữ số liệu 1 tháng rồi mới lên 1%.'},
+// ---- Câu hỏi có hình (nhìn chart để trả lời) ----
+{c:1,img:'trendUp:q',q:'Nhìn chart: cấu trúc thị trường đang là gì?',o:['Xu hướng tăng (HH + HL)','Xu hướng giảm (LH + LL)','Đi ngang, không có xu hướng','Đảo chiều giảm (MSS giảm)'],a:0,e:'Mỗi đỉnh cao hơn đỉnh trước, mỗi đáy cao hơn đáy trước → HH + HL. Đường MA cũng dốc lên.',eimg:'trendUp'},
+{c:1,img:'trendDown:q',q:'Nhìn chart: bias hợp lý cho khung này là gì?',o:['Ưu tiên MUA','Ưu tiên BÁN vì LH + LL','Đứng ngoài vì không rõ','Mua khi chạm MA'],a:1,e:'Đỉnh thấp dần và đáy thấp dần → xu hướng giảm, ưu tiên bán ở các nhịp hồi.',eimg:'trendDown'},
+{c:1,img:'bos:q',q:'Đường ngang có dấu "?" đánh dấu sự kiện gì?',o:['MSS — đảo chiều','BOS — phá đỉnh cùng xu hướng, tiếp diễn','Quét thanh khoản rồi đảo chiều','FVG'],a:1,e:'Giá đóng cửa vượt đỉnh cũ theo đúng chiều xu hướng tăng → BOS, xu hướng tiếp diễn.',eimg:'bos'},
+{c:1,img:'mss:q',q:'Sau nhịp giảm, nến tô cam đóng cửa vượt đường ngang màu cam. Đây là:',o:['BOS giảm','MSS tăng — tín hiệu đảo chiều ở khung nhỏ','Một cú quét đỉnh','Order Block giảm'],a:1,e:'Giá đang giảm (LH, LL), quét đáy rồi nến thân dài phá lên trên đỉnh LH gần nhất → MSS. Điểm vào là khi giá hồi về FVG nó để lại.',eimg:'mss'},
+{c:2,img:'sweepSSL:q',q:'Nến tô cam ở dấu "?" đã làm gì?',o:['Phá vỡ đáy thật, nên bán theo','Quét thanh khoản bên bán (SSL) dưới đáy bằng nhau rồi đóng cửa quay lại','Tạo FVG giảm','Không có ý nghĩa'],a:1,e:'Râu xuyên qua đáy bằng nhau (nơi phe mua đặt stop) nhưng đóng cửa quay lại → cú quét SSL. Giá sau đó tăng mạnh.',eimg:'sweepSSL'},
+{c:2,img:'bsl:q',q:'Đường kẻ ngang nối các đỉnh bằng nhau trong hình là vùng thanh khoản nào?',o:['SSL — stop của phe mua','BSL — stop của phe bán','Midnight Open','CE của FVG'],a:1,e:'Trên đỉnh bằng nhau là stop-loss của người bán → buy-side liquidity. Giá quét lên lấy BSL rồi giảm.',eimg:'bsl'},
+{c:3,img:'fvgBull:q',q:'Vùng tô xanh có dấu "?" là gì?',o:['Order Block giảm','FVG tăng — khoảng trống giữa râu nến 1 và nến 3','Vùng Premium','Range phiên Á'],a:1,e:'Nhịp displacement để lại khoảng giá chưa giao dịch giữa High nến 1 và Low nến 3 → bullish FVG. Giá hồi về 50% (CE) rồi đi tiếp.',eimg:'fvgBull'},
+{c:3,img:'fvgBear:q',q:'Giá đang hồi lên vùng tô đỏ (FVG giảm). Lệnh nào đúng phương pháp?',o:['Buy limit trong vùng','Sell limit tại mép dưới / CE của vùng, SL trên vùng','Buy stop trên vùng','Không làm gì vì FVG không quan trọng'],a:1,e:'FVG giảm là vùng kháng cự trong xu hướng giảm. Bán khi giá hồi vào, SL phía trên.',eimg:'fvgBear'},
+{c:3,img:'ob:q',q:'Hộp xanh có dấu "?" đánh dấu nến tô cam. Đó là:',o:['FVG','Order Block tăng — nến giảm cuối cùng trước displacement','Breaker giảm','Nến quét BSL'],a:1,e:'Nến ngược màu (giảm) cuối cùng trước nhịp tăng mạnh = bullish OB. Giá hồi về OB và bật lên.',eimg:'ob'},
+{c:3,img:'ifvg:q',q:'Vùng tím ban đầu là FVG giảm, sau đó giá đóng cửa xuyên lên và quay lại kiểm tra. Vùng này giờ đóng vai trò gì?',o:['Vẫn là kháng cự','IFVG — trở thành hỗ trợ','Không còn giá trị','Vùng Premium'],a:1,e:'FVG bị phá bằng giá đóng cửa sẽ đổi vai trò (IFVG). Retest từ trên xuống → hỗ trợ.',eimg:'ifvg'},
+{c:4,img:'fibOTE:q',q:'Vùng tô xanh có dấu "?" nằm giữa 0.618 và 0.786. Đó là:',o:['Premium — vùng bán','OTE trong Discount — vùng mua tối ưu','Vùng mở rộng 1.618','Range phiên Á'],a:1,e:'Fibo kéo từ đáy lên đỉnh: dưới 0.5 là Discount, 0.618–0.786 là OTE. Chờ phản ứng + MSS ở đây để mua.',eimg:'fibOTE'},
+{c:5,img:'judas:q',q:'Cú quét xuống ở dấu "?" (đầu London, dưới đáy phiên Á) gọi là gì?',o:['Phá vỡ thật — bán theo','Judas swing — cú chạy giả trước khi giá mở rộng ngược lại','Silver Bullet','London close'],a:1,e:'Power of 3: phiên Á tích lũy → đầu London thao túng (quét đáy Á) → mở rộng tăng.',eimg:'judas'},
+{c:5,img:'crt:q',q:'Nến 2 quét qua CRTH rồi đóng cửa vào lại range nến 1. Mức có dấu "?" là mục tiêu gì?',o:['Mục tiêu cuối cùng','50% range — mục tiêu đầu tiên, sau đó là CRTL','Điểm đặt SL','Không có ý nghĩa'],a:1,e:'CRT: sau Turtle Soup, mục tiêu 1 là 50% range nến 1, mục tiêu 2 là phía đối diện (CRTL).',eimg:'crt'},
+{c:6,img:'modelA:q',q:'Kịch bản 1 (D1 tăng, đang NY AM): giá quét Đáy London, MSS lúc 20:50 để lại FVG 3971.2–3974.6. Theo Mô hình A bạn làm gì?',o:['Mua market ngay','Buy limit tại CE 3972.9, SL dưới râu quét + đệm (3963.9), TP1 Đỉnh London','Bán vì vừa phá đáy London','Chờ sang ngày mai'],a:1,e:'Đủ 3 điều: bias, quét trong killzone, displacement + MSS + FVG. RR tới TP1 = 2.18. Kết quả: chạm TP1 rồi TP2.',eimg:'modelA'},
+{c:6,img:'scen12',q:'Kịch bản 12: quét Đáy Á → MSS → FVG, nhưng TP1 (Đỉnh London 3986.1) khá gần. Entry CE 3976.4, SL 3968.2. Quyết định?',o:['Mua vì đủ mô hình','Bỏ lệnh vì RR tới TP1 ≈ 1.2 < 2','Mua và kéo TP xa hơn cho RR đẹp','Bán ngược'],a:1,e:'(3986.1 − 3976.4) / (3976.4 − 3968.2) ≈ 1.18 < 2 → BỎ. Không kéo TP xa để ép RR.'},
+{c:6,img:'scen13',q:'Kịch bản 13: D1 và H4 đều TĂNG. Giá quét Đỉnh London rồi MSS giảm. Có bán không?',o:['Bán theo Mô hình A','Không vào: setup bán ngược bias D1 tăng','Mua vì quét đỉnh','Bán gấp đôi lot'],a:1,e:'Mô hình A yêu cầu cùng bias D1. Quét đỉnh trong xu hướng tăng thường chỉ là nhịp hồi.'},
+{c:6,img:'scen18',q:'Kịch bản 18: có nến tăng để lại FVG, nhưng giá đang dao động giữa đỉnh/đáy London. Quyết định?',o:['Mua tại FVG','Không vào: chưa có mức thanh khoản nào bị quét','Bán tại FVG','Mua market'],a:1,e:'Không có cú quét = không có "nhiên liệu". Giá giữa range là vùng nhiễu (Flippy).'},
+{c:7,img:'scen3:full',q:'Kịch bản 3: setup đủ điều kiện, đúng luật, nhưng tin CPI đẩy giá chạm SL (-1R). Đánh giá lệnh này?',o:['Lệnh xấu, phải đổi hệ thống','Lệnh tốt — thua đúng hệ thống, rủi ro 1% đã giới hạn thiệt hại','Lẽ ra phải dời SL xa hơn','Lẽ ra phải nhồi thêm lệnh'],a:1,e:'Chấm điểm hành vi trước P&L. Thua đúng luật là chi phí kinh doanh bình thường.'},
 ];

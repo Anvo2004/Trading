@@ -739,21 +739,21 @@ const Quiz = {
         el.innerHTML = `<div class="card"><h3 style="margin-top:0">Kết quả: ${score}/${qs.length} (${pct}%)</h3><div class="bar"><i style="width:${pct}%"></i></div>
           <p>${pct >= 80 ? '✅ Rất tốt! Bạn nắm vững nội dung.' : pct >= 60 ? '🟡 Khá. Xem lại các câu sai và tài liệu chương.' : '🔴 Cần ôn lại lý thuyết trước khi thực chiến.'}</p>
           <div class="row">${opts.chapter ? `<button class="btn pri" onclick="Chapters.open(${opts.chapter},'test')">Làm lại</button>` : '<button class="btn pri" onclick="$(\'#quizSetup\').style.display=\'block\';$(\'#quizRun\').style.display=\'none\'">Làm lại</button>'}<button class="btn" onclick="this.closest(\'.card\').nextElementSibling.style.display=\'block\'">Xem lại câu sai</button></div></div>
-          <div style="display:none">${qs.filter(q => q.wrong).map(q => `<div class="card" style="margin-top:10px"><b>${esc(q.q)}</b><div class="pos" style="margin-top:6px">✔ ${esc(q.o[q.a])}</div><div class="muted">${esc(q.e)}</div></div>`).join('') || '<p class="muted">Không có câu sai 🎉</p>'}</div>`;
+          <div style="display:none">${qs.filter(q => q.wrong).map(q => `<div class="card" style="margin-top:10px"><b>${esc(q.q)}</b><div class="pos" style="margin-top:6px">✔ ${esc(q.o[q.a])}</div><div class="muted">${esc(q.e)}</div>${q.eimg ? Fig.html(q.eimg) : ''}</div>`).join('') || '<p class="muted">Không có câu sai 🎉</p>'}</div>`;
         done && done({ s: score, n: qs.length, pct });
         return;
       }
       const q = qs[i];
       el.innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><span class="pill gold">Chương ${q.c}</span><span class="muted mono">${i + 1}/${qs.length} · Đúng ${score}</span></div>
         <div class="bar" style="margin:10px 0"><i style="width:${i / qs.length * 100}%"></i></div>
-        <h3 style="color:var(--text);margin:14px 0">${esc(q.q)}</h3>
+        <h3 style="color:var(--text);margin:14px 0">${esc(q.q)}</h3>${q.img ? Fig.html(q.img) : ''}
         ${q.o.map((o, j) => `<button class="qopt" data-j="${j}"><b class="muted">${'ABCD'[j]}.</b> ${esc(o)}</button>`).join('')}
         <div id="qExp"></div></div>`;
       $$('.qopt', el).forEach(b => b.onclick = () => {
         if (el.dataset.lock === '1') return; el.dataset.lock = '1';
         const j = +b.dataset.j, ok = j === q.a;
         $$('.qopt', el)[q.a].classList.add('right'); if (!ok) { b.classList.add('wrong'); q.wrong = 1; wrongs.add(q.id); } else { score++; wrongs.delete(q.id); }
-        $('#qExp', el).innerHTML = `<div class="note ${ok ? 'ok' : 'bad'}">${ok ? '✅ Chính xác.' : '❌ Chưa đúng.'} ${esc(q.e)}</div><button class="btn pri" id="qNext">${i + 1 < qs.length ? 'Câu tiếp →' : 'Xem kết quả'}</button>`;
+        $('#qExp', el).innerHTML = `<div class="note ${ok ? 'ok' : 'bad'}">${ok ? '✅ Chính xác.' : '❌ Chưa đúng.'} ${esc(q.e)}</div>${q.eimg && q.eimg !== q.img ? Fig.html(q.eimg, 'Hình minh họa đáp án') : ''}<button class="btn pri" id="qNext">${i + 1 < qs.length ? 'Câu tiếp →' : 'Xem kết quả'}</button>`;
         $('#qNext', el).onclick = () => { el.dataset.lock = '0'; i++; show(); };
       });
     };
@@ -773,7 +773,7 @@ const Scen = {
   show(i) {
     this.i = Math.max(0, Math.min(SCENARIOS.length - 1, i)); Store.set('scenIdx', this.i); this.renderNav();
     const s = SCENARIOS[this.i], r = this.st()[s.n];
-    $('#scenBox').innerHTML = `<div class="grid g2">
+    $('#scenBox').innerHTML = `<div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between"><h4 style="margin:0">Chart M5 của kịch bản</h4><span class="muted" style="font-size:12px" id="scenFigCap"></span></div><div id="scenFig"></div></div><div class="grid g2">
       <div class="card"><div class="row"><span class="pill gold">Bài ${s.n}</span><span class="pill">${esc(s.day)}</span><span class="pill">${esc(s.kz)}</span></div>
         <h3>Bối cảnh</h3><p style="font-size:15px">${esc(s.ctx)}</p>
         <table class="tbl"><tr><td>Bias D1 / H4</td><td><b>${esc(s.d1)}</b> / <b>${esc(s.h4)}</b></td></tr>
@@ -785,7 +785,13 @@ const Scen = {
       <div class="row" style="margin-top:12px;justify-content:space-between"><button class="btn" onclick="Scen.show(${this.i - 1})">← Bài trước</button><button class="btn" onclick="Scen.show(${this.i + 1})">Bài sau →</button></div>`;
     r ? this.reveal(r) : this.ask();
   },
+  fig(full) {
+    const s = SCENARIOS[this.i];
+    $('#scenFig').innerHTML = Fig.html('scen' + s.n + (full ? ':full' : ''));
+    $('#scenFigCap').textContent = full ? 'Đã hiện diễn biến sau đó cùng Entry / SL / TP của đáp án' : 'Chart dừng ở nến MSS (tô cam) — bạn chưa thấy tương lai';
+  },
   ask() {
+    this.fig(false);
     $('#scenAns').innerHTML = `<h4>Quyết định của bạn</h4>
       <div class="seg" id="scDir"><button class="b" data-v="MUA">MUA</button><button class="s" data-v="BÁN">BÁN</button><button class="n" data-v="—">KHÔNG VÀO</button></div>
       <div id="scNums" style="display:none"><div class="grid g3" style="margin-top:10px"><div><label class="f">Entry</label><input type="number" step="0.01" id="scE"></div><div><label class="f">SL</label><input type="number" step="0.01" id="scS"></div><div><label class="f">TP1</label><input type="number" step="0.01" id="scT"></div></div><div class="muted mono" id="scRR" style="margin-top:6px;font-size:12.5px"></div></div>
@@ -803,6 +809,7 @@ const Scen = {
     const st = this.st(); st[s.n] = r; Store.set('scen', st); this.renderNav(); this.reveal(r);
   },
   reveal(r) {
+    this.fig(true);
     const s = SCENARIOS[this.i], tick = b => b ? '<span class="pos">✔</span>' : '<span class="neg">✘</span>';
     $('#scenAns').innerHTML = `<h4>Đáp án</h4>
       <div class="note ${r.ok ? 'ok' : 'bad'}">Bạn chọn <b>${r.dec === '—' ? 'KHÔNG VÀO' : r.dec}</b> · Đáp án <b>${s.dir === '—' ? 'KHÔNG VÀO' : s.dir}</b> ${r.ok ? '✅' : '❌'}</div>
@@ -847,7 +854,7 @@ const Chapters = {
   },
   tab(c, t) {
     const el = $('#chBody'), p = this.prog()[c.id] || {};
-    if (t === 'theory') el.innerHTML = `<div class="card">${c.html}</div>`;
+    if (t === 'theory') { el.innerHTML = `<div class="card">${c.html}</div>`; Fig.hydrate(el); }
     if (t === 'res') {
       const ic = { pdf: '📕', video: '🎬', img: '🖼️', doc: '📝', xlsx: '📊', folder: '📁' };
       el.innerHTML = `<div class="card res"><p class="muted">Các file nằm trong thư mục <code>Documents</code> và <code>ICT_Gold_Playbook</code> trên máy bạn. Video và ảnh mở ngay trong trang.</p>${c.res.map((r, i) => `<a data-i="${i}">${ic[r.k] || '📄'} <span>${esc(r.t)}</span><span class="muted" style="margin-left:auto;font-size:12px">${r.k.toUpperCase()}</span></a>`).join('')}</div>`;

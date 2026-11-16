@@ -126,6 +126,12 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
 .week.ok{border-color:rgba(34,197,139,.5)}
 .dz{border:2px dashed var(--line);border-radius:12px;padding:20px;text-align:center}
 .dz.over{border-color:var(--gold)}
+.fig{margin:14px 0;background:#fff;border-radius:10px;padding:6px;border:1px solid var(--line)}
+.fig svg{display:block;width:100%;height:auto}
+.fig figcaption{color:#4b5563;font-size:12.5px;padding:6px 6px 2px;line-height:1.45}
+.figrow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.figrow .fig{margin:6px 0}
+#quizRun .fig,#chQuiz .fig{max-width:760px}
 @media (max-width:1100px){.labwrap{grid-template-columns:1fr}.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:800px){
   body{flex-direction:column}
@@ -135,7 +141,7 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
   #nav a{white-space:nowrap}
   main{height:auto}
   .page{padding:18px 16px 50px}
-  .g2,.g3,.g4{grid-template-columns:1fr}
+  .g2,.g3,.g4,.figrow{grid-template-columns:1fr}
   #chartBox{height:420px}
 }
 @media print{#side,.noprint{display:none}main{height:auto}.page{display:none}.page.on{display:block}body{background:#fff;color:#000}}
@@ -371,6 +377,7 @@ TRƯỚC KHI BẤM LỆNH
 
 <script src="content.js"></script>
 <script src="scenarios.js"></script>
+<script src="figs.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

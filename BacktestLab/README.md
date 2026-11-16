@@ -9,6 +9,8 @@ Mở **index.html** bằng Chrome hoặc Edge (nhấp đúp). Lần đầu cần
 | Ôn tập trắc nghiệm | 51 câu theo chương, chế độ "Ôn câu sai" |
 | Kịch bản thực chiến | 24 bài lấy từ file Excel `03_Bo_du_lieu_luyen_tap_XAUUSD.xlsx` |
 | Backtest Lab | Nạp CSV từ TradingView/MT5, tua từng nến, đặt lệnh, tự ghi nhật ký |
+| Huấn luyện (trong Lab) | Replay tự dừng ở điểm cố định (trước killzone, khi quét, khi MSS) → hỏi xu hướng D1/H4, Premium/Discount, mức thanh khoản, yếu tố vào lệnh, vẽ FVG, đặt Entry/SL/TP → chấm điểm và tua tới kết quả |
+| Công cụ vẽ (trong Lab) | Đường ngang, đường xu hướng, vùng chữ nhật, Fibo — phím H / T / R / F, Delete để xóa |
 | Thử nghiệm chiến lược | Chạy tự động Mô hình A (Quét → MSS → FVG) với tham số tuỳ chỉnh |
 | Chart TradingView | Chart trực tiếp XAUUSD |
 | Nhật ký & thống kê | Winrate, kỳ vọng R, đường vốn, xuất CSV, sao lưu |

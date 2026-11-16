@@ -214,6 +214,9 @@ const Lab = {
       else if (e.key === ' ') { e.preventDefault(); this.togglePlay(); }
       else if (e.key.toLowerCase() === 'b') this.setDir(1);
       else if (e.key.toLowerCase() === 's') this.setDir(-1);
+      else if (e.key === 'Escape') Draw.set('cursor');
+      else if ((e.key === 'Delete' || e.key === 'Backspace') && Draw.sel >= 0) { e.preventDefault(); Draw.del(); }
+      else { const t = { v: 'cursor', h: 'hline', t: 'line', r: 'box', f: 'fib' }[e.key.toLowerCase()]; if (t && !e.ctrlKey && !e.metaKey) Draw.set(t); }
     });
     const saved = Store.get('data', null);
     if (saved && saved.b && saved.b.length) {
@@ -235,12 +238,15 @@ const Lab = {
     this.cs = this.chart.addCandlestickSeries({ upColor: '#22c58b', downColor: '#f0506e', borderVisible: false, wickUpColor: '#22c58b', wickDownColor: '#f0506e', priceFormat: { type: 'price', precision: 2, minMove: 0.01 } });
     const cv = document.createElement('canvas'); cv.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:2'; el.appendChild(cv); this.cv = cv;
     this.chart.subscribeClick(p => {
-      if (!this.pickMode || !p.point) return;
+      if (Draw.tool !== 'cursor') return Draw.click(p);
+      if (!this.pickMode) return Draw.click(p);
+      if (!p.point) return;
       const pr = this.cs.coordinateToPrice(p.point.y); if (pr == null) return;
       $('#ord' + { entry: 'Entry', sl: 'SL', tp: 'TP' }[this.pickMode]).value = pr.toFixed(2);
       const nxt = { entry: 'sl', sl: 'tp', tp: null }[this.pickMode]; this.pick(nxt); this.calc();
     });
     this.chart.subscribeCrosshairMove(p => {
+      Draw.move(p);
       const d = p && p.seriesData && p.seriesData.get(this.cs);
       const b = d || this.agg[this.agg.length - 1]; if (!b) return;
       $('#legend').innerHTML = `${this.tfName(this.tf)} · O <b>${f2(b.open)}</b> H <b>${f2(b.high)}</b> L <b>${f2(b.low)}</b> C <b>${f2(b.close)}</b>`;
@@ -272,6 +278,7 @@ const Lab = {
   afterLoad(savedIdx) {
     this.ensureChart(); if (!this.chart) return UI.toast('Không tải được thư viện chart (cần Internet lần đầu)');
     $('#chartEmpty').style.display = 'none';
+    Draw.load();
     this.tf = Math.max(Data.tf, 300);
     const tfs = [60, 300, 900, 3600, 14400, 86400].filter(x => x >= Data.tf); if (!tfs.includes(Data.tf)) tfs.unshift(Data.tf);
     $('#tfBtns').innerHTML = tfs.map(x => `<button class="btn sm ${x === this.tf ? 'on' : ''}" data-tf="${x}">${this.tfName(x)}</button>`).join('');
@@ -283,6 +290,7 @@ const Lab = {
     this.cancelPos(true);
     this.idx = savedIdx && savedIdx > 10 && savedIdx <= B.length ? savedIdx : this.findIdx($('#rpDate').value, '19:00');
     this.rebuild(true);
+    Coach.dataChanged();
   },
   findIdx(dateStr, timeStr) {
     const t = Date.parse(dateStr + 'T' + (timeStr || '00:00') + ':00Z') / 1000 - 7 * 3600;
@@ -293,7 +301,7 @@ const Lab = {
   jumpDate() {
     if (!Data.bars.length) return UI.toast('Chưa có dữ liệu');
     if (this.pos && !confirm('Lệnh đang mở sẽ bị hủy khi nhảy ngày. Tiếp tục?')) return;
-    this.cancelPos(true); this.review = null; this.idx = this.findIdx($('#rpDate').value, $('#rpTime').value); this.rebuild(true);
+    this.cancelPos(true); this.review = null; this.idx = this.findIdx($('#rpDate').value, $('#rpTime').value); this.rebuild(true); Coach.jumped();
   },
   rebuild(fit) {
     if (!this.chart || !Data.bars.length) return;
@@ -316,9 +324,11 @@ const Lab = {
   step(silent) {
     if (!Data.bars.length) return false;
     if (this.idx >= Data.bars.length) { this.stopPlay(); UI.toast('Hết dữ liệu'); return false; }
+    if (Coach.blocking()) { this.stopPlay(); UI.toast('Trả lời câu hỏi ở khung 🎓 Huấn luyện trước khi xem nến tiếp'); return false; }
     const i = this.idx, b = Data.bars[i]; this.idx++;
     this.push(b, i, false);
     this.processBar(b, i);
+    if (Coach.hit(i)) this.stopPlay();
     if (!silent) this.refresh();
     return true;
   },
@@ -333,7 +343,7 @@ const Lab = {
     while (this.idx < Data.bars.length && n < 5000) {
       const m = Data.nym[this.idx]; const ik = T.inKZ(m);
       if (!ik) left = true; else if (left) break;
-      this.step(true); n++; if (this.pos && this.pos.status === 'open' && n > 0 && this._closedNow) break;
+      if (!this.step(true) || Coach.blocking()) break; n++; if (this.pos && this.pos.status === 'open' && n > 0 && this._closedNow) break;
     }
     this.rebuild(); this.chart.timeScale().scrollToRealTime();
   },
@@ -406,6 +416,8 @@ const Lab = {
     };
     if (this.pos) zone({ t0: Data.bars[this.pos.placedIdx].t, entry: this.pos.entry, sl: this.pos.sl, tp: this.pos.tp });
     if (this.review) zone(this.review);
+    Coach.renderAnn(g, X, Y, W);
+    Draw.render(g, X, Y, W);
   },
   setDir(d) { this.dir = d; $$('#dirSeg button').forEach(b => b.classList.toggle('on', +b.dataset.d === d)); this.calc(); },
   pick(w) { this.pickMode = w; $('#pickHint').textContent = w ? `👉 Click lên chart để chọn ${w.toUpperCase()}` : ''; },
@@ -679,7 +691,7 @@ const Journal = {
     const grp = (f) => { const g = {}; tr.forEach(t => { const k = f(t); (g[k] = g[k] || []).push(t); }); return '<table class="tbl"><tr><th></th><th>Lệnh</th><th>Thắng</th><th>Kỳ vọng</th></tr>' + Object.entries(g).map(([k, a]) => { const s = Stats.calc(a); return `<tr><td>${esc(k)}</td><td>${a.length}</td><td>${s.wr}%</td><td class="${s.exp >= 0 ? 'pos' : 'neg'}">${fR(s.exp)}</td></tr>`; }).join('') + '</table>'; };
     $('#jBySetup').innerHTML = tr.length ? grp(t => 'Setup ' + t.setup) : '<span class="muted">—</span>';
     $('#jByComp').innerHTML = tr.length ? grp(t => t.chk >= 9 ? '✅ Đủ 9/9 checklist' : '⚠️ Thiếu checklist (' + (t.chk ?? '?') + '/9)') : '<span class="muted">—</span>';
-    const SRC = { replay: 'Lab', auto: 'Tự động', demo: 'Demo', real: 'Thật' };
+    const SRC = { replay: 'Lab', coach: 'Huấn luyện', auto: 'Tự động', demo: 'Demo', real: 'Thật' };
     $('#jTbl').innerHTML = `<tr><th>Thời gian (VN)</th><th>Nguồn</th><th>Setup</th><th>Hướng</th><th>Entry</th><th>SL</th><th>TP</th><th>Kết quả</th><th>R</th><th>Checklist</th><th>Ghi chú</th><th></th></tr>` +
       tr.slice().reverse().slice(0, 500).map(t => `<tr><td class="mono">${t.t ? T.fmt(t.t) : esc(t.date || '')}</td><td>${SRC[t.src] || t.src}</td><td>${esc(t.setup)}</td><td><span class="pill ${t.dir === 1 ? 'up' : 'down'}">${t.dir === 1 ? 'MUA' : 'BÁN'}</span></td><td class="mono">${f2(t.entry)}</td><td class="mono">${f2(t.sl)}</td><td class="mono">${f2(t.tp)}</td><td>${esc(t.outcome)}</td><td class="mono ${t.R >= 0 ? 'pos' : 'neg'}">${fR(t.R)}</td><td>${t.chk ?? '—'}/9</td><td style="max-width:240px">${esc(t.note)}</td><td><button class="btn sm" onclick="Journal.del('${t.id}')">✕</button></td></tr>`).join('');
   },
@@ -973,7 +985,7 @@ const Router = {
 
 /* ---------------- Boot ---------------- */
 window.addEventListener('DOMContentLoaded', () => {
-  Lab.init(); Strat.init(); Quiz.init(); Scen.init(); Tools.init();
+  Coach.init(); Lab.init(); Strat.init(); Quiz.init(); Scen.init(); Tools.init();
   Tools.tick(); setInterval(() => Tools.tick(), 30000);
   window.addEventListener('hashchange', () => Router.go()); Router.go();
   document.addEventListener('keydown', e => { if (e.key === 'Escape') UI.close(); });

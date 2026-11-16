@@ -96,7 +96,19 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
 .qopt.right{border-color:var(--up);background:rgba(34,197,139,.12)}
 .qopt.wrong{border-color:var(--down);background:rgba(240,80,110,.12)}
 /* lab */
-.labwrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px}
+.labwrap{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:14px}
+#drawBar{margin:0 0 6px}
+#drawBar .btn{min-width:34px}
+#drawHint{font-size:12px;color:var(--muted)}
+.coach{border-color:rgba(232,184,74,.55)}
+.coach .cq{font-weight:600;margin:8px 0 4px;font-size:13px}
+.coach .qopt{padding:8px 10px;font-size:12.5px;margin:5px 0}
+.coach .qopt:disabled{cursor:default}
+.coach .cm label{display:flex;gap:8px;font-size:12.5px;padding:5px 6px;border-radius:6px;align-items:flex-start}
+.coach .cm input{accent-color:var(--gold);margin-top:3px}
+.coach .cm label.ok{background:rgba(34,197,139,.1)}.coach .cm label.bad{background:rgba(240,80,110,.14)}
+.coach .cm small{color:var(--muted)}
+.coach .row>div{flex:1}
 #chartBox{height:560px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;position:relative;background:#0b0f17}
 #chartBox .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--muted);text-align:center;padding:20px}
 .toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
@@ -242,10 +254,23 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
   </div>
   <div class="labwrap">
     <div>
+      <div class="toolbar noprint" id="drawBar">
+        <button class="btn sm on" data-tool="cursor" onclick="Draw.set('cursor')" title="Con trỏ / chọn hình (V, Esc)">🖱</button>
+        <button class="btn sm" data-tool="hline" onclick="Draw.set('hline')" title="Đường ngang (H)">— Ngang</button>
+        <button class="btn sm" data-tool="line" onclick="Draw.set('line')" title="Đường xu hướng (T)">╱ Xu hướng</button>
+        <button class="btn sm" data-tool="box" onclick="Draw.set('box')" title="Vùng chữ nhật: FVG, OB, range (R)">▭ Vùng</button>
+        <button class="btn sm" data-tool="fib" onclick="Draw.set('fib')" title="Fibonacci retracement (F)">ƒ Fibo</button>
+        <label class="muted" style="font-size:12px;display:flex;gap:4px;align-items:center" title="Không tự quay về con trỏ sau mỗi lần vẽ"><input type="checkbox" id="drawKeep"> Giữ công cụ</label>
+        <span class="sep"></span>
+        <button class="btn sm" onclick="Draw.del()" title="Xóa hình đang chọn (Delete), nếu không chọn thì xóa hình mới nhất">🗑 Xóa</button>
+        <button class="btn sm" onclick="Draw.clear()">Xóa hết</button>
+        <span id="drawHint">Click vào hình vẽ để chọn · Delete để xóa · Esc để thoát công cụ</span>
+      </div>
       <div id="chartBox"><div class="legend" id="legend"></div><div class="empty" id="chartEmpty"><div style="font-size:40px">📈</div><div>Kéo thả file CSV vào đây, hoặc bấm <b>Nạp CSV</b> / <b>Dữ liệu demo</b>.</div><div class="muted" style="font-size:12px">Phím tắt: → tiến 1 nến · ← lùi · Space chạy/dừng · B/S chọn Mua/Bán</div></div></div>
       <div class="row muted" style="margin-top:6px;font-size:12px" id="dataInfo"></div>
     </div>
     <div class="grid" style="align-content:start">
+      <div class="card coach" id="coachBox"></div>
       <div class="card ticket">
         <h4>Đặt lệnh</h4>
         <div class="seg" id="dirSeg"><button class="b on" data-d="1">MUA</button><button class="s" data-d="-1">BÁN</button></div>
@@ -323,7 +348,7 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
   <h1>Nhật ký & thống kê</h1>
   <p class="lead">Lệnh từ Backtest Lab tự ghi vào đây. Bạn cũng có thể thêm lệnh demo/thật bằng tay.</p>
   <div class="row noprint" style="margin-bottom:12px">
-    <select id="jSrc" style="width:auto" onchange="Journal.render()"><option value="all">Tất cả nguồn</option><option value="replay">Backtest Lab</option><option value="auto">Chiến lược tự động</option><option value="demo">Demo</option><option value="real">Tiền thật</option></select>
+    <select id="jSrc" style="width:auto" onchange="Journal.render()"><option value="all">Tất cả nguồn</option><option value="replay">Backtest Lab</option><option value="coach">Huấn luyện</option><option value="auto">Chiến lược tự động</option><option value="demo">Demo</option><option value="real">Tiền thật</option></select>
     <select id="jSetup" style="width:auto" onchange="Journal.render()"><option value="all">Mọi setup</option><option>A</option><option>B</option><option>C</option><option>Khác</option></select>
     <button class="btn" onclick="Journal.addForm()">+ Thêm lệnh tay</button>
     <button class="btn" onclick="Journal.exportCSV()">⬇ Xuất CSV</button>
@@ -379,5 +404,6 @@ TRƯỚC KHI BẤM LỆNH
 <script src="scenarios.js"></script>
 <script src="figs.js"></script>
 <script src="app.js"></script>
+<script src="coach.js"></script>
 </body>
 </html>

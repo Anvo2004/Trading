@@ -172,6 +172,7 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
     <a href="#plan" data-p="plan">📅 Plan mỗi ngày</a>
     <a href="#lab" data-p="lab">🕹️ Backtest Lab</a>
     <a href="#auto" data-p="auto">⚙️ Thử nghiệm chiến lược</a>
+    <a href="#report" data-p="report">📊 Báo cáo backtest</a>
     <a href="#tv" data-p="tv">📈 Chart TradingView</a>
     <a href="#journal" data-p="journal">📒 Nhật ký & thống kê</a>
     <a href="#tools" data-p="tools">🧮 Công cụ & checklist</a>
@@ -241,6 +242,14 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
   <div id="plOut" style="margin-top:14px"></div>
   <div class="card" id="plHist" style="margin-top:14px"></div>
   <div class="note warn" style="margin-top:14px">Plan là kịch bản "nếu – thì" theo luật cố định, không phải tín hiệu chắc chắn. Chỉ vào lệnh khi giá tới vùng VÀ có xác nhận (MSS hoặc EMA cắt). Không phải khuyến nghị đầu tư.</div>
+</section>
+
+<!-- ================= REPORT ================= -->
+<section class="page" id="p-report">
+  <h1>Báo cáo backtest — 6 năm XAUUSD</h1>
+  <p class="lead">Kiểm tra tự động 5 nhóm chiến lược scalp (ICT, EMA9/21 của video, pullback RSI, MACD, phá range phiên Á) và nhóm swing (xu hướng D1 → hồi RSI H4 → kích hoạt H1). Không nhìn trước tương lai: khung lớn chỉ dùng nến đã đóng; SL và TP cùng chạm trong 1 nến thì tính SL; mỗi chiến lược tối đa 1 lệnh cùng lúc.</p>
+  <div id="rpOut"></div>
+  <div class="card" style="margin-top:14px"><h4>Cách tự chạy lại</h4><p class="muted" style="font-size:13px;margin:0">Mã nguồn ở thư mục <code>BacktestLab/backtest/</code> (Python + pandas): <code>python run.py &lt;thư mục&gt; &lt;file.csv&gt; 2021-01-01</code>. File CSV: <code>time,open,high,low,close,volume</code> — có thể dùng file xuất từ TradingView (Export chart data) hoặc MT5.</p></div>
 </section>
 
 <!-- ================= LAB ================= -->
@@ -432,5 +441,7 @@ TRƯỚC KHI BẤM LỆNH
 <script src="app.js"></script>
 <script src="coach.js"></script>
 <script src="plan.js"></script>
+<script src="data/bt.js"></script>
+<script src="report.js"></script>
 </body>
 </html>

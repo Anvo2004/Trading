@@ -1022,6 +1022,7 @@ const Router = {
     if (page === 'chapters') sub ? Chapters.open(+sub) : Chapters.index();
     if (page === 'journal') Journal.render();
     if (page === 'tools') Tools.sessTable();
+    if (page === 'report') Report.render();
     if (page === 'lab') { Lab.ensureChart(); Lab.renderStats(); }
     if (page !== 'chapters') main().scrollTop = 0;
   },

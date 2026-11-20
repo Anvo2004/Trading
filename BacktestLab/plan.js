@@ -17,14 +17,14 @@ const Plan = {
     while (out.length < total) {
       const r = await fetch(`${this.API}&interval=${iv}&limit=1000&endTime=${end}`); if (!r.ok) throw new Error('Binance ' + r.status);
       const k = await r.json(); if (!k.length) break;
-      out = k.map(a => ({ t: a[0] / 1000, o: +a[1], h: +a[2], l: +a[3], c: +a[4] })).concat(out);
+      out = k.map(a => ({ t: a[0] / 1000, o: +a[1], h: +a[2], l: +a[3], c: +a[4], v: +a[5] })).concat(out);
       end = k[0][0] - 1; if (k.length < 1000) break;
     }
     return out.filter(b => !this.closed(b.t));
   },
   agg(bars, tf) {
     const out = [];
-    for (const b of bars) { const bk = Data.bucket(b.t, tf), l = out[out.length - 1]; if (l && l.t === bk) { l.h = Math.max(l.h, b.h); l.l = Math.min(l.l, b.l); l.c = b.c; } else out.push({ t: bk, o: b.o, h: b.h, l: b.l, c: b.c }); }
+    for (const b of bars) { const bk = Data.bucket(b.t, tf), l = out[out.length - 1]; if (l && l.t === bk) { l.h = Math.max(l.h, b.h); l.l = Math.min(l.l, b.l); l.c = b.c; l.v += b.v || 0; } else out.push({ t: bk, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v || 0 }); }
     return out;
   },
   index(bars) {
@@ -75,12 +75,12 @@ const Plan = {
     const out = $('#plOut'); out.innerHTML = '<div class="card muted">Đang tải dữ liệu…</div>';
     try {
       if (src === 'live') {
-        const [h1, m5] = await Promise.all([this.fetchK('1h', 2000), this.fetchK('5m', 1000)]);
-        this.H = h1; this.M = m5; this.srcName = 'PAXG/USDT (Binance) — gần với XAUUSD';
+        const [h1, m5, d1] = await Promise.all([this.fetchK('1h', 2000), this.fetchK('5m', 1000), this.fetchK('1d', 400)]);
+        this.H = h1; this.M = m5; this.Dd = d1; this.srcName = 'PAXG/USDT (Binance) — gần với XAUUSD';
       } else {
         if (!Data.bars.length) throw new Error('Chưa nạp dữ liệu ở Backtest Lab');
         const end = Lab.idx || Data.bars.length;
-        this.M = Data.bars.slice(Math.max(0, end - 1500), end); this.H = this.agg(Data.bars.slice(0, end), 3600); this.srcName = Data.name + ' (tới nến đang replay)';
+        this.M = Data.bars.slice(Math.max(0, end - 1500), end); this.H = this.agg(Data.bars.slice(0, end), 3600); this.Dd = this.agg(Data.bars.slice(0, end), 86400); this.srcName = Data.name + ' (tới nến đang replay)';
       }
       this.build();
     } catch (e) { out.innerHTML = `<div class="note bad">Không tải được dữ liệu: ${esc(e.message)}. Thử lại, hoặc chọn nguồn "Dữ liệu đã nạp ở Lab".</div>`; }
@@ -177,6 +177,8 @@ const Plan = {
         <div class="card"><h4>Vùng hỗ trợ / kháng cự (đỉnh-đáy H1 chạm ≥ 2 lần)</h4><table class="tbl">${zRows || '<tr><td class="muted">Chưa có vùng chạm ≥ 2 lần gần giá</td></tr>'}</table>
           <div class="muted" style="font-size:12px">Số tròn gần nhất: ${F(A.rDn)} / ${F(A.rUp)}</div></div>
       </div>
+      ${this.indPanel()}
+      ${this.swingPanel(off)}
       <div class="card" style="margin-top:14px"><h4>Chart H1 + EMA9 (trắng) / EMA21 (xanh) + các mức</h4><div id="plChart" style="height:460px;position:relative"></div></div>
       <div class="row" style="margin-top:10px"><button class="btn" onclick="Plan.copy()">📋 Sao chép plan dạng chữ</button><button class="btn" onclick="Plan.toLab()">Mở Backtest Lab với dữ liệu này</button></div>`;
     this.text = `PLAN XAUUSD ${vnDate.slice(3, 13)}\nGiá: ${F(A.px)} | D1: ${word} | H4: ${['GIẢM', 'NGANG', 'TĂNG'][A.h4.v + 1]} | ${A.prem ? 'Premium' : 'Discount'} (50% = ${F(A.mid)})\n${main.t}\n- Vùng: ${main.zone}\n- Vào: ${main.how}\n- ${main.sl}\n- ${main.tp}\n${alt}\n${inval}\nKillzone VN: London ${kzVN(120, 300)}, NY AM ${kzVN(420, 600)}`;
@@ -194,6 +196,58 @@ const Plan = {
     A.lv.forEach(L => cs.createPriceLine({ price: L.p + off, color: L.kind === 'ref' ? '#8a96ad' : L.taken ? '#4b5563' : L.p > A.px ? '#f0506e' : '#22c58b', lineWidth: 1, lineStyle: 2, title: L.n }));
     [...A.zUp, ...A.zDn].forEach(z => { cs.createPriceLine({ price: z.hi + off, color: '#e8b84a', lineWidth: 1, lineStyle: 1, title: '' }); cs.createPriceLine({ price: z.lo + off, color: '#e8b84a', lineWidth: 1, lineStyle: 1, title: z.lo > A.px ? 'Kháng cự' : 'Hỗ trợ' }); });
     ch.timeScale().setVisibleLogicalRange({ from: H.length - 120, to: H.length + 5 });
+  },
+  rsi(c, n = 14) {
+    let up = 0, dn = 0; const o = [50];
+    for (let i = 1; i < c.length; i++) { const d = c[i] - c[i - 1]; up = (up * (n - 1) + Math.max(d, 0)) / n; dn = (dn * (n - 1) + Math.max(-d, 0)) / n; o.push(dn ? 100 - 100 / (1 + up / dn) : 100); }
+    return o;
+  },
+  ind(bars) {
+    const c = bars.map(b => b.c), e = n => this.ema(c, n), e26 = e(26), m = e(12).map((x, i) => x - e26[i]), sg = this.ema(m, 9), hist = m.map((x, i) => x - sg[i]);
+    const tr = bars.map((b, i) => i ? Math.max(b.h - b.l, Math.abs(b.h - bars[i - 1].c), Math.abs(b.l - bars[i - 1].c)) : b.h - b.l), atr = [];
+    tr.forEach((x, i) => atr.push(i ? (atr[i - 1] * 13 + x) / 14 : x));
+    return { c, e9: e(9), e21: e(21), e50: e(50), e200: e(200), rsi: this.rsi(c), macd: m, sig: sg, hist, atr, v: bars.map(b => b.v || 0) };
+  },
+  indPanel() {
+    const TF = [['D1', this.Dd && this.Dd.length > 60 ? this.Dd : this.agg(this.H, 86400)], ['H4', this.agg(this.H, 14400)], ['H1', this.H], ['M15', this.agg(this.M, 900)], ['M5', this.M]];
+    const rows = TF.map(([n, B]) => {
+      if (!B || B.length < 30) return '';
+      const I = this.ind(B), k = B.length - 1, kk = k - 1, c = I.c[k], e9 = I.e9[k], e21 = I.e21[k], e50 = I.e50[k], e200 = I.e200[k], r = I.rsi[k], h = I.hist[k], hp = I.hist[k - 1];
+      const tr = c > e50 && e50 > e200 ? 1 : c < e50 && e50 < e200 ? -1 : 0;
+      const vs = I.v.slice(Math.max(0, kk - 20), kk), vma = vs.length ? vs.reduce((a, x) => a + x, 0) / vs.length : 0, vr = vma ? I.v[kk] / vma : 0;
+      const rs = r < 30 ? '<span class="pill up">Quá bán</span>' : r > 70 ? '<span class="pill down">Quá mua</span>' : r > 50 ? 'trên 50' : 'dưới 50';
+      const mac = `${I.macd[k] > I.sig[k] ? 'MACD > Signal' : 'MACD < Signal'}, hist ${h >= 0 ? '+' : ''}${h.toFixed(1)} ${Math.abs(h) > Math.abs(hp) ? (h > 0 ? '↑ lực tăng mạnh dần' : '↓ lực giảm mạnh dần') : (h > 0 ? '↘ lực tăng yếu đi' : '↗ lực giảm yếu đi')}`;
+      const pill = tr === 1 ? '<span class="pill up">TĂNG</span>' : tr === -1 ? '<span class="pill down">GIẢM</span>' : '<span class="pill gold">ĐAN XEN</span>';
+      return `<tr><td><b>${n}</b></td><td>${pill}</td><td class="mono">EMA9 ${e9 > e21 ? '>' : '<'} EMA21<br><span class="muted">${f2(e9)} / ${f2(e21)}</span></td><td class="mono">${c > e50 ? 'trên' : 'dưới'} EMA50 ${f2(e50)}<br><span class="muted">${c > e200 ? 'trên' : 'dưới'} EMA200 ${f2(e200)}</span></td><td class="mono">${r.toFixed(1)} ${rs}</td><td style="font-size:12.5px">${mac}</td><td class="mono">${vr ? vr.toFixed(2) + '×' : '—'}</td></tr>`;
+    }).join('');
+    return `<div class="card" style="margin-top:14px"><h4>Chỉ báo theo khung (nến gần nhất)</h4><div class="tblwrap"><table class="tbl"><tr><th>Khung</th><th>Xu hướng (giá/EMA50/EMA200)</th><th>EMA9/21</th><th>EMA50/200</th><th>RSI 14</th><th>MACD 12-26-9</th><th>Volume / TB 20</th></tr>${rows}</table></div>
+      <p class="muted" style="font-size:12px;margin:6px 0 0">Volume = khối lượng nến đã đóng gần nhất so với trung bình 20 nến (PAXG trên Binance, chỉ để so sánh tương đối). XAUUSD trên TradingView/MT5 chỉ có tick volume; khối lượng thật của vàng xem ở hợp đồng COMEX:GC1!.</p></div>`;
+  },
+  // Luật W đã backtest: xu hướng D1 → RSI H4 hồi → EMA9×21 H1; SL đỉnh/đáy 24 nến H1 ± 0.3×ATR; TP 3R; giữ tối đa 5 ngày
+  swingPanel(off) {
+    const D = this.Dd && this.Dd.length > 210 ? this.Dd : null;
+    if (!D) return '<div class="note">Cần ≥ 210 nến D1 để tính tín hiệu swing (EMA200).</div>';
+    const Di = this.ind(D.slice(0, -1)), k = Di.c.length - 1;
+    const trD = Di.c[k] > Di.e50[k] && Di.e50[k] > Di.e200[k] ? 1 : Di.c[k] < Di.e50[k] && Di.e50[k] < Di.e200[k] ? -1 : 0;
+    const H4 = this.agg(this.H, 14400).slice(0, -1), r4 = this.ind(H4).rsi.slice(-24), H = this.H.slice(0, -1), I = this.ind(H), n = H.length - 1;
+    const rMax = Math.max(...r4), rMin = Math.min(...r4), pull = trD === 1 ? rMin < 45 : trD === -1 ? rMax > 55 : false;
+    let sig = null;
+    for (let i = n; i > n - 6; i--) {
+      const up = I.e9[i] > I.e21[i] && I.e9[i - 1] <= I.e21[i - 1], dn = I.e9[i] < I.e21[i] && I.e9[i - 1] >= I.e21[i - 1];
+      if (pull && ((trD === 1 && up) || (trD === -1 && dn))) { sig = i; break; }
+    }
+    const F = p => f2(p + off), dw = trD === 1 ? 'MUA' : 'BÁN';
+    let st, cls = 'warn';
+    if (!trD) st = 'D1 không có xu hướng rõ (giá, EMA50, EMA200 không xếp thẳng hàng) → <b>KHÔNG giao dịch swing</b>.';
+    else if (!pull) st = `D1 đang <b>${trD === 1 ? 'TĂNG' : 'GIẢM'}</b> (giá ${F(Di.c[k])}, EMA50 ${F(Di.e50[k])}, EMA200 ${F(Di.e200[k])}) → chỉ ${dw}. Nhưng RSI H4 chưa ${trD === 1 ? 'hồi xuống dưới 45' : 'hồi lên trên 55'} trong 4 ngày qua (${trD === 1 ? 'thấp nhất ' + rMin.toFixed(1) : 'cao nhất ' + rMax.toFixed(1)}) → giá chưa hồi, <b>CHƯA vào</b>. Không ${dw.toLowerCase()} đuổi.`;
+    else if (sig == null) st = `D1 <b>${trD === 1 ? 'TĂNG' : 'GIẢM'}</b> + RSI H4 đã hồi (${trD === 1 ? rMin.toFixed(1) : rMax.toFixed(1)}) → <b>CHỜ EMA9 cắt ${trD === 1 ? 'LÊN' : 'XUỐNG'} EMA21 trên H1</b> (đóng nến) để vào ${dw}.`;
+    else {
+      const e = H[sig].c, a = Math.max(0, sig - 23), seg = H.slice(a, sig + 1);
+      const sl = trD === 1 ? Math.min(...seg.map(b => b.l)) - 0.3 * I.atr[sig] : Math.max(...seg.map(b => b.h)) + 0.3 * I.atr[sig], r = Math.abs(e - sl);
+      cls = 'ok'; st = `<b>CÓ TÍN HIỆU ${dw}</b> (nến H1 đóng lúc ${T.fmt(H[sig].t + 3600)}): Entry ${F(e)} · SL ${F(sl)} (${r.toFixed(1)}$) · TP 3R ${F(e + trD * 3 * r)} · đóng lệnh sau tối đa 5 ngày.`;
+    }
+    return `<div class="card" style="margin-top:14px"><h4>Tín hiệu SWING (giữ 3–5 ngày) — luật đã backtest 6 năm</h4><div class="note ${cls}" style="font-size:13px">${st}</div>
+      <div class="muted" style="font-size:12.5px">Luật: D1 giá, EMA50, EMA200 xếp cùng hướng → RSI H4 hồi (&lt;45 khi mua / &gt;55 khi bán) trong 24 nến H4 gần nhất → vào khi EMA9 cắt EMA21 trên H1 (nến đã đóng) → SL dưới đáy / trên đỉnh 24 nến H1 ± 0.3×ATR(H1) → TP 3R hoặc đóng sau 5 ngày. Kết quả 6 năm: 132 lệnh, thắng 41%, +0.20R/lệnh (xem trang Báo cáo backtest).</div></div>`;
   },
   copy() { if (!this.text) return; navigator.clipboard.writeText(this.text).then(() => UI.toast('Đã sao chép plan')); },
   toLab() {

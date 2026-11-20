@@ -1026,6 +1026,8 @@ const Router = {
     if (page === 'journal') Journal.render();
     if (page === 'tools') Tools.sessTable();
     if (page === 'report') Report.render();
+    if (page === 'method') Method.render();
+    if (page === 'live') Live.render();
     if (page === 'plan' && !Plan.H.length && $('#plSrc').value === 'live') Plan.run();
     if (page === 'lab') { Lab.ensureChart(); Lab.renderStats(); }
     if (page !== 'chapters') main().scrollTop = 0;
@@ -1034,7 +1036,7 @@ const Router = {
 
 /* ---------------- Boot ---------------- */
 window.addEventListener('DOMContentLoaded', () => {
-  Coach.init(); Lab.init(); Strat.init(); Plan.init(); Quiz.init(); Scen.init(); Tools.init();
+  Coach.init(); Lab.init(); Strat.init(); Plan.init(); Live.init(); Quiz.init(); Scen.init(); Tools.init();
   Tools.tick(); setInterval(() => Tools.tick(), 30000);
   window.addEventListener('hashchange', () => Router.go()); Router.go();
   document.addEventListener('keydown', e => { if (e.key === 'Escape') UI.close(); });

@@ -169,6 +169,8 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
     <a href="#quiz" data-p="quiz">📝 Ôn tập trắc nghiệm</a>
     <a href="#scen" data-p="scen">🎲 Kịch bản thực chiến</a>
     <div class="sec">Thực chiến</div>
+    <a href="#method" data-p="method">📘 Phương pháp giao dịch</a>
+    <a href="#live" data-p="live">🕐 Nhận định theo giờ</a>
     <a href="#plan" data-p="plan">📅 Plan mỗi ngày</a>
     <a href="#lab" data-p="lab">🕹️ Backtest Lab</a>
     <a href="#auto" data-p="auto">⚙️ Thử nghiệm chiến lược</a>
@@ -185,6 +187,7 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
 <section class="page" id="p-home">
   <h1>Chào mừng trở lại 👋</h1>
   <p class="lead">Lộ trình: <b>Học 8 chương → Ôn tập → Backtest 50 mẫu → Demo 30 lệnh → Tiền thật lot nhỏ</b>. Mọi tiến độ được lưu trên trình duyệt này.</p>
+  <div id="homeLive"></div>
   <div class="grid g4" id="homeKpi"></div>
   <h2>Lộ trình 8 tuần</h2>
   <div id="roadmap"></div>
@@ -226,6 +229,21 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
   <p class="lead">Lấy từ sheet <b>Bai_tap</b> / <b>Dap_an</b> trong file Excel. Đọc bối cảnh → ra quyết định → điền Entry/SL/TP → so với đáp án và kết quả thực tế của kịch bản.</p>
   <div class="row" style="margin-bottom:12px" id="scenNav"></div>
   <div id="scenBox"></div>
+</section>
+
+<!-- ================= PHƯƠNG PHÁP ================= -->
+<section class="page" id="p-method">
+  <h1>Phương pháp giao dịch</h1>
+  <p class="lead">Swing XAUUSD theo xu hướng: <b>D1 xác định hướng → H4 chờ nhịp hồi → H1 tìm điểm vào</b>. Được chọn sau khi kiểm tra hàng trăm triệu lệnh mô phỏng trên dữ liệu tick thật của Exness 2021–2026.</p>
+  <div id="mtOut"></div>
+  <div class="note warn" style="margin-top:14px">Kết quả quá khứ không đảm bảo tương lai. Đây là tài liệu học tập, không phải khuyến nghị đầu tư. Chỉ dùng tiền bạn chấp nhận mất.</div>
+</section>
+
+<!-- ================= NHẬN ĐỊNH THEO GIỜ ================= -->
+<section class="page" id="p-live">
+  <h1>Nhận định theo giờ</h1>
+  <p class="lead">Bot chạy trên GitHub <b>mỗi giờ, 24/7</b> (không cần mở máy): kiểm tra 3 bước của phương pháp, chỉ báo đa khung, mức thanh khoản, cấu trúc ICT và tin đỏ USD, rồi viết nhận định "làm gì bây giờ". Trang tự tải lại mỗi 10 phút.</p>
+  <div id="lvOut"></div>
 </section>
 
 <!-- ================= DAILY PLAN ================= -->
@@ -458,5 +476,7 @@ TRƯỚC KHI BẤM LỆNH
 <script src="data/opt.js"></script>
 <script src="data/mtf.js"></script>
 <script src="report.js"></script>
+<script src="method.js"></script>
+<script src="live.js"></script>
 </body>
 </html>

@@ -1,0 +1,37 @@
+# Nhận định XAUUSD tự động mỗi giờ (24/7, chạy trên máy chủ GitHub, không cần mở máy tính).
+# Kết quả ghi vào nhánh "live" (chỉ 1 commit, ghi đè mỗi giờ) → trang web đọc live.json từ raw.githubusercontent.com.
+name: Nhan dinh theo gio
+on:
+  schedule:
+    - cron: '4 * * * *'     # phút thứ 4 mỗi giờ (sau khi nến H1 đóng); GitHub có thể chạy trễ vài-chục phút
+  workflow_dispatch:         # cho phép bấm chạy tay trong tab Actions
+permissions:
+  contents: write
+concurrency:
+  group: live
+  cancel-in-progress: false
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: BacktestLab/backtest
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Lấy nhận định cũ (để giữ lịch sử)
+        run: |
+          git fetch --depth 1 origin live && git show origin/live:live.json > /tmp/prev.json || echo '{}' > /tmp/prev.json
+      - name: Phân tích & viết nhận định
+        run: python -I BacktestLab/backtest/live.py /tmp/prev.json /tmp/out
+      - name: Đẩy lên nhánh live
+        run: |
+          cd /tmp/out
+          git init -q -b live
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add live.json
+          git commit -q -m "Nhận định $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" live

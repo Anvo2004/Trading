@@ -10,6 +10,7 @@ const Report = {
       <tr><td colspan="3"><b>Tổng ngoài mẫu (giống giao dịch thật)</b></td><td class="mono">${W.oos_n}</td><td class="mono ${cls(W.oos_exp)}"><b>${fR(W.oos_exp)}</b>/lệnh (${W.oos_R >= 0 ? '+' : ''}${W.oos_R}R)</td></tr></table></div>` : '';
     const mg = Object.entries(O.marg).map(([k, v]) => `<tr><td>${{ trend: 'Xu hướng D1', lo: 'Ngưỡng RSI H4 hồi', win: 'Cửa sổ (nến H4)', trig: 'Tín hiệu H1', sl: 'Kiểu SL', ex: 'Thoát lệnh', hold: 'Giữ tối đa (ngày)' }[k] || k}</td><td>${Object.entries(v).map(([a, b]) => `<span class="pill ${b > 0 ? 'up' : 'down'}" style="margin:2px">${esc(a.replace(/[()']/g, ''))}: ${fR(b)}</span>`).join(' ')}</td></tr>`).join('');
     el.innerHTML = `<h2>Train trên dữ liệu thật của Exness (XAUUSDm, tài khoản Standard)</h2>
+      ${O.updated ? `<p class="muted" style="margin:-4px 0 10px">Train lại tự động lần cuối: <b>${esc(O.updated)}</b> (mỗi Chủ nhật, dữ liệu tick mới nhất của Exness)${O.prev_pick && O.prev_pick !== P.name ? ' · <span class="pill gold">phương pháp vừa thay đổi so với lần trước</span>' : ' · phương pháp giữ nguyên'}</p>` : ''}
       <div class="grid g4">
         <div class="card kpi"><div class="v">${O.n_combos.toLocaleString()}</div><div class="l">tổ hợp tham số swing đã thử</div></div>
         <div class="card kpi"><div class="v">${(O.n_trades_total + (O.scalp_total || 0)).toLocaleString()}</div><div class="l">lệnh mô phỏng (swing + scalp)</div></div>

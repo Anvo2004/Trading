@@ -193,7 +193,7 @@ const Data = {
 
 /* ---------------- Backtest Lab (replay) ---------------- */
 const Lab = {
-  chart: null, cs: null, kzS: null, idx: 0, tf: 300, agg: [], play: null, show: { kz: true, lv: true, fvg: false },
+  chart: null, cs: null, kzS: null, idx: 0, tf: 300, agg: [], play: null, show: { kz: true, lv: true, fvg: false, bos: false, crt: false, sw: false }, ictKey: '', ictR: null,
   lvLines: [], lvSig: '', pos: null, posLines: [], marks: [], pickMode: null, dir: 1, sessionId: Date.now(), review: null,
   CHK: ['Đang trong killzone (19:30–22:00 / 14:00–16:30)', 'Có cú QUÉT thanh khoản rõ ràng', 'Có DISPLACEMENT + MSS đóng cửa qua đỉnh/đáy', 'FVG/OB chưa bị chạm, vào bằng LIMIT', 'Cùng hướng bias D1 / đúng Premium-Discount', 'SL sau râu quét + 1–1.5$ đệm', 'TP tại thanh khoản đối diện, RR ≥ 2', 'Lot = rủi ro / (SL × 100), làm tròn xuống', 'Hôm nay chưa có lệnh, tuần chưa -3R'],
   init() {
@@ -202,6 +202,8 @@ const Lab = {
     $$('#dirSeg button').forEach(b => b.onclick = () => this.setDir(+b.dataset.d));
     ['ordEntry', 'ordSL', 'ordTP', 'ordBal', 'ordRisk'].forEach(id => $('#' + id).addEventListener('input', () => this.calc()));
     $('#ordBal').value = Store.get('bal', 1000); $('#ordRisk').value = Store.get('risk', 1);
+    Object.assign(this.show, Store.get('labShow', {})); ['fvg', 'bos', 'crt', 'sw', 'kz', 'lv'].forEach(k => { const b = $({ kz: '#tgKZ', lv: '#tgLv', fvg: '#tgFvg', bos: '#tgBos', crt: '#tgCrt', sw: '#tgSw' }[k]); if (b) b.classList.toggle('on', !!this.show[k]); });
+    $('#ictN').value = Store.get('ictN', 3);
     $('#csvFile').onchange = e => this.loadFile(e.target.files[0]);
     const box = $('#chartBox');
     box.addEventListener('dragover', e => { e.preventDefault(); box.style.outline = '2px dashed var(--gold)'; });
@@ -349,8 +351,9 @@ const Lab = {
   },
   toggle(k) {
     this.show[k] = !this.show[k];
-    $({ kz: '#tgKZ', lv: '#tgLv', fvg: '#tgFvg' }[k]).classList.toggle('on', this.show[k]);
-    this.rebuild();
+    $({ kz: '#tgKZ', lv: '#tgLv', fvg: '#tgFvg', bos: '#tgBos', crt: '#tgCrt', sw: '#tgSw' }[k]).classList.toggle('on', this.show[k]);
+    Store.set('labShow', this.show);
+    if (k === 'kz') this.rebuild();
   },
   refresh() {
     const B = Data.bars; if (!B.length || !this.idx) return;
@@ -371,15 +374,18 @@ const Lab = {
     this.lvLines.forEach(l => this.cs.removePriceLine(l));
     this.lvLines = L.map(([t, p, c]) => this.cs.createPriceLine({ price: p, color: c, lineWidth: 1, lineStyle: t === 'Midnight Open' ? 1 : 2, axisLabelVisible: true, title: t }));
   },
-  fvgs() {
-    const A = this.agg, out = [], from = Math.max(2, A.length - 300);
-    for (let i = from; i < A.length; i++) {
-      const a = A[i - 2], c = A[i];
-      if (c.low > a.high) out.push({ i0: i - 1, top: c.low, bot: a.high, up: 1 });
-      else if (c.high < a.low) out.push({ i0: i - 1, top: a.low, bot: c.high, up: 0 });
-    }
-    out.forEach(f => { f.i1 = A.length - 1; for (let j = f.i0 + 2; j < A.length; j++) { if (f.up ? A[j].low <= f.bot : A[j].high >= f.top) { f.i1 = j; f.filled = 1; break; } } });
-    return out;
+  // Cấu trúc ICT tính trên tối đa 600 nến gần nhất (chỉ dữ liệu đã hiện → không nhìn trước), lưu cache theo vị trí replay
+  ict() {
+    const n = +($('#ictN') && $('#ictN').value) || 3, key = `${this.idx}|${this.tf}|${this.agg.length}|${n}`;
+    if (key === this.ictKey && this.ictR) return this.ictR;
+    const off = Math.max(0, this.agg.length - 600), A = this.agg.slice(off), B = A.map(a => ({ o: a.open, h: a.high, l: a.low, c: a.close }));
+    const htf = { 60: 3600, 300: 3600, 900: 14400, 1800: 14400, 3600: 14400, 14400: 86400, 86400: 86400 }[this.tf] || 14400, raw = Data.bars;
+    const s0 = Math.max(0, A[0].i0), HB = [];
+    for (let i = s0; i < this.idx; i++) { const b = raw[i], bk = Data.bucket(b.t, htf), l = HB[HB.length - 1]; if (l && l.bk === bk) { l.h = Math.max(l.h, b.h); l.l = Math.min(l.l, b.l); l.c = b.c; l.r1 = i; } else HB.push({ bk, t: b.t, o: b.o, h: b.h, l: b.l, c: b.c, r0: i, r1: i }); }
+    const last = HB[HB.length - 1], closed = last && this.idx < raw.length && Data.bucket(raw[this.idx].t, htf) !== last.bk;
+    const ai = r => { let lo = 0, hi = A.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (A[m].i1 < r) lo = m + 1; else hi = m; } return lo; };
+    const R = ICT.analyze(B, n, { htf: { bars: HB, tf: htf, name: this.tfName(htf), map: (b, end) => end ? ai(b.r1) + 1 : ai(b.r0), lastClosed: closed ? HB.length - 1 : HB.length - 2 } });
+    R.off = off; this.ictKey = key; this.ictR = R; return R;
   },
   draw() {
     if (!this.chart || !this.cv || !this.agg.length) return;
@@ -405,10 +411,7 @@ const Lab = {
         if (s >= 0 && (!z || z !== this.agg[s].kz)) { const x0 = X(s) - bw / 2, x1 = X(i - 1) + bw / 2; g.fillStyle = this.agg[s].kz === 1 ? 'rgba(76,141,255,.07)' : 'rgba(232,184,74,.07)'; g.fillRect(x0, 0, x1 - x0, H); s = z ? i : -1; }
       }
     }
-    if (this.show.fvg) this.fvgs().forEach(f => {
-      box(f.i0 - 0.4, f.i1 + 0.4, f.top, f.bot, f.up ? 'rgba(34,197,139,.22)' : 'rgba(240,80,110,.22)', f.filled ? null : (f.up ? 'rgba(34,197,139,.7)' : 'rgba(240,80,110,.7)'));
-      const ce = Y((f.top + f.bot) / 2), x0 = X(f.i0), x1 = X(f.i1); if (ce != null && x0 != null && x1 != null) { g.setLineDash([3, 3]); g.strokeStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.moveTo(x0, ce); g.lineTo(x1, ce); g.stroke(); g.setLineDash([]); }
-    });
+    if ((this.show.fvg || this.show.bos || this.show.crt || this.show.sw) && vr) { const R = this.ict(); ICT.paint(g, i => X(i + R.off), Y, W, R, this.show, vr.from - R.off, vr.to - R.off); }
     const zone = (z) => {
       const ai = t => { const bk = Data.bucket(t, this.tf); let lo = 0, hi = this.agg.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (this.agg[m].bk < bk) lo = m + 1; else hi = m; } return lo; };
       const i0 = ai(z.t0), i1 = z.t1 ? ai(z.t1) : this.agg.length + 3;
@@ -1023,6 +1026,7 @@ const Router = {
     if (page === 'journal') Journal.render();
     if (page === 'tools') Tools.sessTable();
     if (page === 'report') Report.render();
+    if (page === 'plan' && !Plan.H.length && $('#plSrc').value === 'live') Plan.run();
     if (page === 'lab') { Lab.ensureChart(); Lab.renderStats(); }
     if (page !== 'chapters') main().scrollTop = 0;
   },

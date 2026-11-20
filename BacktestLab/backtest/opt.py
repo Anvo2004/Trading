@@ -17,6 +17,7 @@ H1, H4, D1 = htf(df, 'b_h1'), htf(df, 'b_h4'), htf(df, 'b_d1')
 sp = df['spread'].fillna(df['spread'].median()).values.astype(float)
 A = H1; n = len(A['c']); t = A['end']; cost = sp[A['i1']] + SLIP
 yr = pd.to_datetime(t - 1, unit='s').year.values
+YEARS = list(range(2021, int(yr.max()) + 1))   # tự mở rộng khi có dữ liệu năm mới
 id1 = np.searchsorted(D1['end'], t, side='right') - 1; ih4 = np.searchsorted(H4['end'], t, side='right') - 1
 valid = (id1 >= 200) & (ih4 >= 50) & (yr >= 2021)
 g = lambda X, I, k, lag=0: X[k][np.clip(I - lag, 0, None)]
@@ -58,7 +59,7 @@ for ci, cb in enumerate(combos):
     tr = sim(sig, A, cost, P['hold'] * 24, T=t, swap=SWAP, exitarr=TRAIL if P['ex'] == 'trail' else None)
     R = np.array([x['R'] for x in tr]); Y = yr[[x['i'] for x in tr]] if tr else np.array([], int)
     S = stats(tr); S.update({k: (list(v) if isinstance(v, tuple) else v) for k, v in P.items()})
-    S['ys'] = {int(y): [int((Y == y).sum()), round(float(R[Y == y].sum()), 2)] for y in range(2021, 2027)}
+    S['ys'] = {int(y): [int((Y == y).sum()), round(float(R[Y == y].sum()), 2)] for y in YEARS}
     S['long'] = round(float(R[[x['d'] == 1 for x in tr]].mean()), 3) if any(x['d'] == 1 for x in tr) else 0
     S['short'] = round(float(R[[x['d'] == -1 for x in tr]].mean()), 3) if any(x['d'] == -1 for x in tr) else 0
     S['id'] = ci; rows.append(S); TRADES[ci] = [(int(t[x['f']]), int(t[x['x']]), x['d'], x['R'], round(float(A['c'][x['i']]), 2), x['r']) for x in tr]
@@ -75,7 +76,8 @@ def agg(r, ys):
     nn = sum(r['ys'][y][0] for y in ys); ss = sum(r['ys'][y][1] for y in ys); return nn, ss
 
 # ---------- walk-forward ----------
-def wf(rows_, test_years=(2023, 2024, 2025, 2026)):
+def wf(rows_, test_years=None):
+    test_years = test_years or YEARS[2:]
     folds = []; on = 0; os_ = 0.0
     for Y in test_years:
         tr_y = [y for y in range(2021, Y)]
@@ -89,8 +91,8 @@ print(json.dumps(WF, ensure_ascii=False, indent=1))
 # ---------- chọn phương pháp cuối: mạnh trên cả 6 năm + ổn định từng năm ----------
 def yexp(r, y): n_, s_ = r['ys'][y]; return s_ / n_ if n_ else 0
 def robust(r):
-    pos = sum(1 for y in range(2021, 2027) if r['ys'][y][0] and yexp(r, y) > 0)
-    worst = min(yexp(r, y) for y in range(2021, 2027) if r['ys'][y][0]) if r['n'] else -9
+    pos = sum(1 for y in YEARS if r['ys'][y][0] and yexp(r, y) > 0)
+    worst = min(yexp(r, y) for y in YEARS if r['ys'][y][0]) if r['n'] else -9
     return pos, worst
 cand = [r for r in rows if r['n'] >= 60]
 for r in cand: r['pos_years'], r['worst_year'] = robust(r); r['score'] = round(score(r['n'], r['n'] * r['exp']), 2)
@@ -115,7 +117,7 @@ if SCALP and os.path.exists(SCALP):
     srows = [r for r in sc['res'] if r['group'] == 'scalp' and r.get('ys')]
     for r in srows: r['ys'] = {int(k): v for k, v in r['ys'].items()}
     for r in srows:
-        for y in range(2021, 2027): r['ys'].setdefault(y, [0, 0])
+        for y in YEARS: r['ys'].setdefault(y, [0, 0])
     res['scalp_wf'] = wf(srows); res['scalp_total'] = int(sum(r['n'] for r in sc['res'])); res['scalp_rows'] = [{k: r[k] for k in ('name', 'n', 'wr', 'exp', 'pf', 'dd', 'is', 'oos', 'long', 'short', 'years') if k in r} for r in sc['res']]
     res['scalp_now'] = sc.get('now')
 json.dump(res, open(OUT, 'w', encoding='utf-8'), ensure_ascii=False, default=lambda o: o.tolist() if hasattr(o, 'tolist') else str(o))

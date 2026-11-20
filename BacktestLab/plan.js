@@ -9,6 +9,12 @@ const Plan = {
   init() {
     $('#plSrc').value = Store.get('plSrc', 'live');
     $('#plOff').value = Store.get('plOff', '');
+    this.show = Store.get('plShow', { fvg: true, bos: true, crt: true, sw: false });
+    $('#plAuto').checked = Store.get('plAuto', true);
+    $('#plAuto').onchange = () => { Store.set('plAuto', $('#plAuto').checked); this.schedule(); };
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && this.auto() && this.lastRun && Date.now() - this.lastRun > 62 * 60e3) this.run(true); });
+    this.schedule();
+    const loop = () => { if (Router.cur === 'plan') this.paint(); requestAnimationFrame(loop); }; requestAnimationFrame(loop);
     this.renderHist();
   },
   closed(t) { const d = new Date((t + T.off(t) * 3600) * 1000), w = d.getUTCDay(), h = d.getUTCHours(); return w === 6 || (w === 5 && h >= 17) || (w === 0 && h < 18); },
@@ -70,20 +76,23 @@ const Plan = {
     return { v, txt: `Đỉnh H4 ${f2(h1)} → ${f2(h2)} (${h2 > h1 ? 'HH' : 'LH'}), đáy ${f2(l1)} → ${f2(l2)} (${l2 > l1 ? 'HL' : 'LL'})`, h2, l2 };
   },
 
-  async run() {
+  async run(silent) {
+    if (this.busy) return; this.busy = true;
     const src = $('#plSrc').value; Store.set('plSrc', src);
-    const out = $('#plOut'); out.innerHTML = '<div class="card muted">Đang tải dữ liệu…</div>';
+    const out = $('#plOut'); if (!silent || !this.H.length) out.innerHTML = '<div class="card muted">Đang tải dữ liệu…</div>';
+    this.keepRange = silent && this.chart ? this.chart.timeScale().getVisibleLogicalRange() : null;
     try {
       if (src === 'live') {
-        const [h1, m5, d1] = await Promise.all([this.fetchK('1h', 2000), this.fetchK('5m', 1000), this.fetchK('1d', 400)]);
+        const [h1, m5, d1] = await Promise.all([this.fetchK('1h', 6000), this.fetchK('5m', 1000), this.fetchK('1d', 400)]);
         this.H = h1; this.M = m5; this.Dd = d1; this.srcName = 'PAXG/USDT (Binance) — gần với XAUUSD';
       } else {
         if (!Data.bars.length) throw new Error('Chưa nạp dữ liệu ở Backtest Lab');
         const end = Lab.idx || Data.bars.length;
         this.M = Data.bars.slice(Math.max(0, end - 1500), end); this.H = this.agg(Data.bars.slice(0, end), 3600); this.Dd = this.agg(Data.bars.slice(0, end), 86400); this.srcName = Data.name + ' (tới nến đang replay)';
       }
-      this.build();
-    } catch (e) { out.innerHTML = `<div class="note bad">Không tải được dữ liệu: ${esc(e.message)}. Thử lại, hoặc chọn nguồn "Dữ liệu đã nạp ở Lab".</div>`; }
+      this.lastRun = Date.now(); this.build(); this.autoInfo();
+    } catch (e) { if (silent && this.H.length) { UI.toast('Tự cập nhật lỗi mạng, sẽ thử lại giờ sau'); return; } out.innerHTML = `<div class="note bad">Không tải được dữ liệu: ${esc(e.message)}. Thử lại, hoặc chọn nguồn "Dữ liệu đã nạp ở Lab".</div>`; }
+    finally { this.busy = false; }
   },
   offset() { const v = +$('#plOff').value; Store.set('plOff', $('#plOff').value); const px = this.H[this.H.length - 1].c; return v > 0 ? v - px : 0; },
 
@@ -114,7 +123,12 @@ const Plan = {
   build() {
     const A = this.analyze(this.H, this.M, Infinity); if (!A) return $('#plOut').innerHTML = '<div class="note bad">Không đủ dữ liệu.</div>';
     const off = this.offset(), o = p => p + off, F = p => f2(o(p));
-    this.last = A;
+    this.last = A; this.off_ = off;
+    const ib = A.H.slice(-300); this.ictB = ib;
+    const H4 = this.agg(A.H, 14400), lastB = A.H[A.H.length - 1];
+    const firstIdx = t => { let lo = 0, hi = ib.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ib[m].t < t) lo = m + 1; else hi = m; } return lo; };
+    this.ictR = ICT.analyze(ib.map(b => ({ o: b.o, h: b.h, l: b.l, c: b.c })), 3, { htf: { bars: H4.filter(b => b.t >= ib[0].t), tf: 14400, name: 'H4', map: (b, end) => firstIdx(end ? b.t + 14400 : b.t),
+      lastClosed: (() => { const hb = H4.filter(b => b.t >= ib[0].t); return lastB.t + 3600 >= hb[hb.length - 1].t + 14400 ? hb.length - 1 : hb.length - 2; })() } });
     const up = A.lv.filter(L => L.p > A.px && !L.taken && L.kind === 'liq').sort((a, b) => a.p - b.p);
     const dn = A.lv.filter(L => L.p < A.px && !L.taken && L.kind === 'liq').sort((a, b) => b.p - a.p);
     const zs = z => `${F(z.lo)}–${F(z.hi)} (chạm ${z.n} lần)`;
@@ -179,23 +193,38 @@ const Plan = {
       </div>
       ${this.indPanel()}
       ${this.swingPanel(off)}
-      <div class="card" style="margin-top:14px"><h4>Chart H1 + EMA9 (trắng) / EMA21 (xanh) + các mức</h4><div id="plChart" style="height:460px;position:relative"></div></div>
+      ${this.ictCard()}
+      <div class="card" style="margin-top:14px"><div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h4 style="margin:0">Chart H1 + EMA9 (trắng) / EMA21 (xanh) + các mức + ICT</h4>
+        <div class="row" id="plIctBtns" style="gap:6px">${[['fvg', 'FVG'], ['bos', 'BOS / MSS'], ['crt', 'CRT H4'], ['sw', 'HH/HL/LH/LL']].map(([k, n]) => `<button class="btn sm ${this.show[k] ? 'on' : ''}" data-k="${k}" onclick="Plan.togICT('${k}')">${n}</button>`).join('')}</div></div><div id="plChart" style="height:460px;position:relative"></div></div>
       <div class="row" style="margin-top:10px"><button class="btn" onclick="Plan.copy()">📋 Sao chép plan dạng chữ</button><button class="btn" onclick="Plan.toLab()">Mở Backtest Lab với dữ liệu này</button></div>`;
     this.text = `PLAN XAUUSD ${vnDate.slice(3, 13)}\nGiá: ${F(A.px)} | D1: ${word} | H4: ${['GIẢM', 'NGANG', 'TĂNG'][A.h4.v + 1]} | ${A.prem ? 'Premium' : 'Discount'} (50% = ${F(A.mid)})\n${main.t}\n- Vùng: ${main.zone}\n- Vào: ${main.how}\n- ${main.sl}\n- ${main.tp}\n${alt}\n${inval}\nKillzone VN: London ${kzVN(120, 300)}, NY AM ${kzVN(420, 600)}`;
     this.drawChart(A, off);
+    this.lotCalc();
     this.renderHist();
   },
   drawChart(A, off) {
     const el = $('#plChart'); if (!el || typeof LightweightCharts === 'undefined') return;
-    const ch = LightweightCharts.createChart(el, { autoSize: true, layout: { background: { type: 'solid', color: '#0b0f17' }, textColor: '#8a96ad' }, grid: { vertLines: { color: '#131a29' }, horzLines: { color: '#131a29' } }, timeScale: { timeVisible: true, borderColor: '#243049' }, rightPriceScale: { borderColor: '#243049' } });
-    const H = A.H.slice(-300), cs = ch.addCandlestickSeries({ upColor: '#22c58b', downColor: '#f0506e', borderVisible: false, wickUpColor: '#22c58b', wickDownColor: '#f0506e' });
+    if (this.chart) { try { this.chart.remove(); } catch (e) { } }
+    const ch = this.chart = LightweightCharts.createChart(el, { autoSize: true, layout: { background: { type: 'solid', color: '#0b0f17' }, textColor: '#8a96ad' }, grid: { vertLines: { color: '#131a29' }, horzLines: { color: '#131a29' } }, timeScale: { timeVisible: true, borderColor: '#243049' }, rightPriceScale: { borderColor: '#243049' } });
+    const H = A.H.slice(-300), cs = this.cs = ch.addCandlestickSeries({ upColor: '#22c58b', downColor: '#f0506e', borderVisible: false, wickUpColor: '#22c58b', wickDownColor: '#f0506e' });
     cs.setData(H.map(b => ({ time: b.t + 7 * 3600, open: b.o + off, high: b.h + off, low: b.l + off, close: b.c + off })));
     const cl = A.H.map(b => b.c), e9 = this.ema(cl, 9).slice(-300), e21 = this.ema(cl, 21).slice(-300);
     ch.addLineSeries({ color: '#ffffff', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }).setData(H.map((b, i) => ({ time: b.t + 7 * 3600, value: e9[i] + off })));
     ch.addLineSeries({ color: '#4c8dff', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }).setData(H.map((b, i) => ({ time: b.t + 7 * 3600, value: e21[i] + off })));
     A.lv.forEach(L => cs.createPriceLine({ price: L.p + off, color: L.kind === 'ref' ? '#8a96ad' : L.taken ? '#4b5563' : L.p > A.px ? '#f0506e' : '#22c58b', lineWidth: 1, lineStyle: 2, title: L.n }));
     [...A.zUp, ...A.zDn].forEach(z => { cs.createPriceLine({ price: z.hi + off, color: '#e8b84a', lineWidth: 1, lineStyle: 1, title: '' }); cs.createPriceLine({ price: z.lo + off, color: '#e8b84a', lineWidth: 1, lineStyle: 1, title: z.lo > A.px ? 'Kháng cự' : 'Hỗ trợ' }); });
-    ch.timeScale().setVisibleLogicalRange({ from: H.length - 120, to: H.length + 5 });
+    const cv = document.createElement('canvas'); cv.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:2'; el.appendChild(cv); this.cv = cv;
+    ch.timeScale().setVisibleLogicalRange(this.keepRange || { from: H.length - 120, to: H.length + 5 }); this.keepRange = null;
+  },
+  paint() {
+    if (!this.chart || !this.cv || !this.ictR || !document.body.contains(this.cv)) return;
+    const ts = this.chart.timeScale(), el = $('#plChart'), dpr = window.devicePixelRatio || 1, W = ts.width(), Hh = el.clientHeight - ts.height();
+    if (this.cv.width !== W * dpr || this.cv.height !== Hh * dpr) { this.cv.width = W * dpr; this.cv.height = Hh * dpr; this.cv.style.width = W + 'px'; this.cv.style.height = Hh + 'px'; }
+    const g = this.cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, Hh);
+    const X0 = i => ts.logicalToCoordinate(Math.round(i)), bw = Math.max(1, (X0(1) ?? 1) - (X0(0) ?? 0));
+    const X = i => { const r = Math.round(i), x = X0(r); return x == null ? null : x + (i - r) * bw; }, Y = p => this.cs.priceToCoordinate(p + this.off_);
+    const vr = ts.getVisibleLogicalRange(); if (!vr) return;
+    ICT.paint(g, X, Y, W, this.ictR, this.show, vr.from, vr.to);
   },
   rsi(c, n = 14) {
     let up = 0, dn = 0; const o = [50];
@@ -228,51 +257,120 @@ const Plan = {
   // ② H4: RSI14 hồi < 40 (MUA) / > 60 (BÁN) trong 24 nến H4 gần nhất
   // ③ H1: RSI14 cắt qua 50 theo hướng xu hướng + nến H4 gần nhất đóng cùng phía EMA21 H4 → vào lệnh khi nến H1 đóng
   // SL = 1×ATR14 D1 · TP = 2R · đóng lệnh nếu sau 7 ngày chưa chạm SL/TP
-  swingPanel(off) {
-    const D = this.Dd && this.Dd.length > 60 ? this.Dd : null;
-    if (!D) return '<div class="note">Cần ≥ 60 nến D1 để tính tín hiệu.</div>';
-    const Dc = D.slice(0, -1), Di = this.ind(Dc), k = Di.c.length - 1;
-    const trD = Di.c[k] > Di.e50[k] && Di.e50[k] > Di.e50[k - 5] ? 1 : Di.c[k] < Di.e50[k] && Di.e50[k] < Di.e50[k - 5] ? -1 : 0;
-    const datr = Di.atr[k];
-    const H = this.H.slice(0, -1), I = this.ind(H), n = H.length - 1;
-    const H4 = this.agg(this.H, 14400), I4 = this.ind(H4);
-    const h4At = j => { const tEnd = H[j].t + 3600; let lo = 0, hi = H4.length - 1, r = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (H4[m].t + 14400 <= tEnd) { r = m; lo = m + 1; } else hi = m - 1; } return r; };
-    const rsiWin = j => { const q = h4At(j); return q < 0 ? [] : I4.rsi.slice(Math.max(0, q - 23), q + 1); };
-    const h4side = j => { const q = h4At(j); return q < 0 ? 0 : H4[q].c > I4.e21[q] ? 1 : -1; };
-    const F = p => f2(p + off), dw = d => d === 1 ? 'MUA' : 'BÁN';
-    const isSig = (i, d) => {
-      const r4 = rsiWin(i); if (!r4.length || i < 1) return false;
-      const x = d === 1 ? I.rsi[i] > 50 && I.rsi[i - 1] <= 50 : I.rsi[i] < 50 && I.rsi[i - 1] >= 50;
-      return x && (d === 1 ? Math.min(...r4) < 40 : Math.max(...r4) > 60) && h4side(i) === d;
+  // method() chạy lại luật này trên TOÀN BỘ dữ liệu vừa tải (≈ 1 năm H1) → backtest liên tục, tự chạy lại mỗi giờ.
+  LIVE_FROM: Date.UTC(2026, 10, 20) / 1000,   // lệnh từ ngày này trở đi = giao dịch thật sau khi train (ngoài mẫu hoàn toàn)
+  method() {
+    const D = this.Dd, Hall = this.H; if (!D || D.length < 70 || Hall.length < 300) return null;
+    const H = Hall.slice(0, -1), n = H.length, I = this.ind(H), Di = this.ind(D), H4 = this.agg(H, 14400), I4 = this.ind(H4);
+    const trades = []; let pos = null, qd = -1, q4 = -1, st = null;
+    const exitChk = (b, tEnd) => {
+      const d = pos.d; let px = null, why = '';
+      if (d === 1 ? b.l <= pos.sl : b.h >= pos.sl) { px = pos.sl; why = 'SL'; }
+      else if (d === 1 ? b.h >= pos.tp : b.l <= pos.tp) { px = pos.tp; why = 'TP'; }
+      else if (tEnd - pos.t >= 7 * 86400) { px = b.c; why = '7 ngày'; }
+      if (px == null) return false;
+      const nights = Math.floor((tEnd - pos.t) / 86400), cost = 0.35 + 0.5 * nights;   // spread+trượt giá ≈ 0.35$, swap ≈ 0.5$/đêm
+      trades.push({ ...pos, xt: tEnd, xp: px, why, R: +(((px - pos.e) * d - cost) / pos.r).toFixed(2) }); pos = null; return true;
     };
-    // tín hiệu gần nhất trong 7 ngày và trạng thái lệnh tới hiện tại
-    let last = null;
-    if (trD) for (let i = n; i > n - 7 * 24 && i > 1; i--) if (isSig(i, trD)) { last = i; break; }
-    let st = '', cls = 'warn';
-    if (last != null) {
-      const d = trD, e = H[last].c, sl = e - d * datr, tp = e + d * 2 * datr;
-      let exit = null;
-      for (let j = last + 1; j <= n; j++) {
-        if (d === 1 ? H[j].l <= sl : H[j].h >= sl) { exit = { j, px: sl, why: 'chạm SL' }; break; }
-        if (d === 1 ? H[j].h >= tp : H[j].l <= tp) { exit = { j, px: tp, why: 'chạm TP' }; break; }
-        if (H[j].t - H[last].t >= 7 * 86400) { exit = { j, px: H[j].c, why: 'hết 7 ngày' }; break; }
+    for (let j = 1; j < n; j++) {
+      const tEnd = H[j].t + 3600;
+      while (qd + 1 < D.length && D[qd + 1].t + 86400 <= tEnd) qd++;
+      while (q4 + 1 < H4.length && H4[q4 + 1].t + 14400 <= tEnd) q4++;
+      if (pos) exitChk(H[j], tEnd);
+      if (qd < 60 || q4 < 24) continue;
+      const trD = Di.c[qd] > Di.e50[qd] && Di.e50[qd] > Di.e50[qd - 5] ? 1 : Di.c[qd] < Di.e50[qd] && Di.e50[qd] < Di.e50[qd - 5] ? -1 : 0;
+      const w = I4.rsi.slice(q4 - 23, q4 + 1), rMin = Math.min(...w), rMax = Math.max(...w), side = H4[q4].c > I4.e21[q4] ? 1 : -1;
+      const pulled = trD === 1 ? rMin < 40 : trD === -1 ? rMax > 60 : false;
+      if (j === n - 1) st = { trD, rMin, rMax, side, pulled, rsi: I.rsi[j], datr: Di.atr[qd], dc: Di.c[qd], e50: Di.e50[qd], e50p: Di.e50[qd - 5] };
+      if (pos || !trD || !pulled || side !== trD) continue;
+      if (trD === 1 ? I.rsi[j] > 50 && I.rsi[j - 1] <= 50 : I.rsi[j] < 50 && I.rsi[j - 1] >= 50) {
+        const e = H[j].c, r = Di.atr[qd]; pos = { d: trD, t: tEnd, e, sl: e - trD * r, tp: e + 2 * trD * r, r };
       }
-      const R = px => ((px - e) * d / datr).toFixed(2);
-      const head = `Tín hiệu ${dw(d)} lúc ${T.fmt(H[last].t + 3600)} · Entry ${F(e)} · SL ${F(sl)} · TP ${F(tp)} (SL = ${datr.toFixed(1)}$)`;
-      if (exit) st = `${head}<br>→ Đã đóng lúc ${T.fmt(H[exit.j].t + 3600)} (${exit.why}) = <b>${R(exit.px)}R</b>.`;
-      else { cls = 'ok'; st = `<b>LỆNH ĐANG CHẠY</b> — ${head}<br>Giá hiện tại ${F(H[n].c)} = <b>${R(H[n].c)}R</b>. Giữ tới khi chạm SL/TP, tối đa 7 ngày (tới ${T.fmt(H[last].t + 3600 + 7 * 86400)}).`; }
     }
-    const r4 = rsiWin(n), rMin = r4.length ? Math.min(...r4) : 50, rMax = r4.length ? Math.max(...r4) : 50, side = h4side(n);
-    const pulled = trD === 1 ? rMin < 40 : rMax > 60;
-    const wait = !trD ? `D1 chưa có xu hướng rõ (giá ${F(Di.c[k])}, EMA50 ${F(Di.e50[k])}, EMA50 5 ngày trước ${F(Di.e50[k - 5])}) → <b>KHÔNG giao dịch</b>.`
-      : `① D1 <b>${trD === 1 ? 'TĂNG' : 'GIẢM'}</b> (giá ${F(Di.c[k])} ${trD === 1 ? '>' : '<'} EMA50 ${F(Di.e50[k])}, EMA50 ${trD === 1 ? 'đi lên' : 'đi xuống'}) → chỉ ${dw(trD)}.<br>` +
-        `② RSI H4 trong 4 ngày: ${trD === 1 ? 'thấp nhất ' + rMin.toFixed(1) + (pulled ? ' &lt; 40 ✅ đã hồi' : ' — cần &lt; 40 ❌ chưa hồi') : 'cao nhất ' + rMax.toFixed(1) + (pulled ? ' &gt; 60 ✅ đã hồi' : ' — cần &gt; 60 ❌ chưa hồi')}.<br>` +
-        `③ Nến H4 gần nhất đóng ${side === 1 ? 'TRÊN' : 'DƯỚI'} EMA21 H4 ${side === trD ? '✅' : '❌'} · RSI H1 hiện ${I.rsi[n].toFixed(1)} → ${pulled && side === trD ? `<b>chờ RSI H1 cắt ${trD === 1 ? 'LÊN' : 'XUỐNG'} 50</b> để vào ${dw(trD)}` : '<b>chưa đủ điều kiện, KHÔNG vào</b>'}.<br>` +
-        `Nếu vào bây giờ: SL = 1×ATR D1 = <b>${datr.toFixed(1)}$</b> → TP = ${(2 * datr).toFixed(1)}$.`;
-    return `<div class="card" style="margin-top:14px;border-color:rgba(34,197,139,.5)"><h4>🎯 Phương pháp đã train trên dữ liệu Exness — swing 3–7 ngày</h4>
-      ${st ? `<div class="note ${cls}" style="font-size:13px">${st}</div>` : ''}<div class="note" style="font-size:13px">${wait}</div>
-      <div class="muted" style="font-size:12.5px">Luật: ① D1 xác định xu hướng: giá trên EMA50 và EMA50 cao hơn 5 ngày trước → chỉ MUA (ngược lại chỉ BÁN) · ② H4 kiểm tra nhịp hồi: RSI14 xuống dưới 40 (MUA) / lên trên 60 (BÁN) trong 24 nến H4 gần nhất · ③ H1 tìm điểm vào: RSI14 cắt qua 50 theo hướng xu hướng, và nến H4 gần nhất đóng cùng phía EMA21 H4 → vào lệnh khi nến H1 đóng · SL = 1×ATR14 D1 · TP = 2R · đóng sau 7 ngày nếu chưa chạm.
-      Kết quả 2021–2026 trên dữ liệu Exness (spread thật + trượt giá + swap 0.5$/đêm): 82 lệnh, thắng 58.5%, +0.46R/lệnh, PF 2.17, sụt giảm tối đa 4.6R, dương cả 6/6 năm.</div></div>`;
+    if (pos) { const b = Hall[Hall.length - 1]; exitChk(b, b.t + 3600); }   // nến đang chạy: chạm SL/TP thì tính luôn
+    // lưu nhật ký để lịch sử không mất khi dữ liệu trực tuyến trượt đi
+    const J = Store.get('fwd', {}); trades.forEach(x => J[x.t] = x); Store.set('fwd', J);
+    const all = Object.values(J).sort((a, b) => a.t - b.t);
+    return { trades: all, pos, st, from: H[0].t, to: H[n - 1].t + 3600 };
+  },
+  swingPanel(off) {
+    const M = this.M_ = this.method();
+    if (!M || !M.st) return '<div class="note">Cần ≥ 300 nến H1 và 70 nến D1 để chạy phương pháp.</div>';
+    const F = p => f2(p + off), dw = d => d === 1 ? 'MUA' : 'BÁN', s = M.st, P = M.pos;
+    let head = '';
+    if (P) {
+      const now = this.H[this.H.length - 1].c, R = ((now - P.e) * P.d / P.r).toFixed(2);
+      head = `<div class="note ok" style="font-size:13.5px"><b>🟢 LỆNH ĐANG CHẠY — ${dw(P.d)}</b> từ ${T.fmt(P.t)} · Entry <b>${F(P.e)}</b> · SL <b>${F(P.sl)}</b> · TP <b>${F(P.tp)}</b> (SL cách ${P.r.toFixed(1)}$)<br>Giá hiện tại ${F(now)} = <b>${R}R</b>. Giữ tới khi chạm SL/TP, tối đa tới ${T.fmt(P.t + 7 * 86400)}. Không dời SL.</div>`;
+      if (P.t > Store.get('lastSig', 0)) { Store.set('lastSig', P.t); this.notify(`Tín hiệu ${dw(P.d)} XAUUSD`, `Entry ${F(P.e)} · SL ${F(P.sl)} · TP ${F(P.tp)}`); }
+    }
+    const wait = !s.trD ? `① D1 chưa có xu hướng rõ (giá ${F(s.dc)}, EMA50 ${F(s.e50)}, EMA50 5 ngày trước ${F(s.e50p)}) → <b>KHÔNG giao dịch</b>.`
+      : `① D1 <b>${s.trD === 1 ? 'TĂNG' : 'GIẢM'}</b> (giá ${F(s.dc)} ${s.trD === 1 ? '>' : '<'} EMA50 ${F(s.e50)}, EMA50 ${s.trD === 1 ? 'đi lên' : 'đi xuống'}) → chỉ ${dw(s.trD)} ✅<br>` +
+        `② RSI H4 trong 4 ngày: ${s.trD === 1 ? 'thấp nhất ' + s.rMin.toFixed(1) + (s.pulled ? ' &lt; 40 ✅ đã hồi' : ' — cần &lt; 40 ❌ chưa hồi') : 'cao nhất ' + s.rMax.toFixed(1) + (s.pulled ? ' &gt; 60 ✅ đã hồi' : ' — cần &gt; 60 ❌ chưa hồi')}<br>` +
+        `③ Nến H4 gần nhất đóng ${s.side === 1 ? 'TRÊN' : 'DƯỚI'} EMA21 H4 ${s.side === s.trD ? '✅' : '❌'} · RSI H1 hiện ${s.rsi.toFixed(1)} → ${P ? 'đang có lệnh, không vào thêm' : s.pulled && s.side === s.trD ? `<b>chờ RSI H1 cắt ${s.trD === 1 ? 'LÊN' : 'XUỐNG'} 50</b> rồi vào ${dw(s.trD)} khi nến H1 đóng` : '<b>chưa đủ điều kiện, KHÔNG vào</b>'}<br>` +
+        `SL nếu vào bây giờ = 1×ATR D1 = <b>${s.datr.toFixed(1)}$</b> → TP = ${(2 * s.datr).toFixed(1)}$.`;
+    const T_ = M.trades, live = T_.filter(x => x.t >= this.LIVE_FROM), win = T_.filter(x => x.t >= M.from);
+    const sm = a => { const n = a.length, w = a.filter(x => x.R > 0).length, R = a.reduce((q, x) => q + x.R, 0); return n ? `${n} lệnh · thắng ${Math.round(w / n * 100)}% · tổng <b class="${R >= 0 ? 'pos' : 'neg'}">${R >= 0 ? '+' : ''}${R.toFixed(2)}R</b> · TB ${(R / n >= 0 ? '+' : '') + (R / n).toFixed(2)}R/lệnh` : 'chưa có lệnh'; };
+    const rows = T_.slice().reverse().slice(0, 25).map(x => `<tr><td class="mono">${T.fmt(x.t).slice(3)}${x.t >= this.LIVE_FROM ? ' <span class="pill gold">thật</span>' : ''}</td><td><span class="pill ${x.d === 1 ? 'up' : 'down'}">${dw(x.d)}</span></td><td class="mono">${F(x.e)}</td><td class="mono">${F(x.sl)} / ${F(x.tp)}</td><td class="mono">${T.fmt(x.xt).slice(3)}</td><td>${x.why}</td><td class="mono ${x.R > 0 ? 'pos' : 'neg'}"><b>${x.R > 0 ? '+' : ''}${x.R}R</b></td></tr>`).join('');
+    return `<div class="card" style="margin-top:14px;border-color:rgba(34,197,139,.5)"><h4>🎯 Phương pháp đã train (Exness 2021–2026) — swing 3–7 ngày</h4>
+      ${head}<div class="note" style="font-size:13px">${wait}</div>
+      <div id="plLot"></div>
+      <div class="muted" style="font-size:12.5px">Luật: ① D1: giá trên EMA50 và EMA50 cao hơn 5 ngày trước → chỉ MUA (ngược lại chỉ BÁN) · ② H4: RSI14 xuống dưới 40 (MUA) / lên trên 60 (BÁN) trong 24 nến H4 gần nhất · ③ H1: RSI14 cắt qua 50 theo hướng xu hướng và nến H4 gần nhất đóng cùng phía EMA21 H4 → vào lệnh khi nến H1 đóng · SL = 1×ATR14 D1 · TP = 2R · đóng sau 7 ngày nếu chưa chạm.
+      Kết quả train 2021–2026 (spread thật + trượt giá + swap): 82 lệnh, thắng 58.5%, +0.46R/lệnh, PF 2.17, sụt giảm tối đa 4.6R, dương cả 6/6 năm.</div></div>
+    <div class="card" style="margin-top:14px"><h4>📈 Backtest liên tục trên dữ liệu mới nhất (tự chạy lại mỗi giờ)</h4>
+      <div class="grid g2" style="margin:6px 0 10px"><div class="note" style="font-size:13px;margin:0"><b>Dữ liệu vừa tải</b> (${T.fmt(M.from).slice(3, 13)} → ${T.fmt(M.to).slice(3)}): ${sm(win)}</div>
+      <div class="note ${live.length ? 'ok' : ''}" style="font-size:13px;margin:0"><b>Giao dịch thật sau khi train</b> (từ 20/11/2026, ghi trong trình duyệt này): ${sm(live)}</div></div>
+      <div class="tblwrap" style="max-height:360px"><table class="tbl"><tr><th>Vào lúc (VN)</th><th>Lệnh</th><th>Entry</th><th>SL / TP</th><th>Đóng lúc</th><th>Lý do</th><th>Kết quả</th></tr>${rows || '<tr><td colspan="7" class="muted">Chưa có lệnh trong dữ liệu đã tải</td></tr>'}</table></div>
+      <p class="muted" style="font-size:12px;margin:6px 0 0">Giá PAXG (≈ XAUUSD). Mỗi lệnh đã trừ ~0.35$ spread/trượt giá và 0.5$/đêm swap. Lệnh đánh dấu <span class="pill gold">thật</span> là lệnh xuất hiện SAU khi phương pháp được train → đây mới là bằng chứng thật; theo dõi ít nhất 20–30 lệnh trước khi tăng vốn.</p></div>`;
+  },
+  // Tính lot theo vốn thật. XAUUSD: 1 lot = 100 oz → lot 0.01 = 1$ mỗi 1$ giá chạy. Tài khoản Cent: lỗ/lãi tính bằng US cent (1/100).
+  lotCalc() {
+    const el = $('#plLot'); if (!el || !this.M_ || !this.M_.st) return;
+    if (!el.innerHTML) el.innerHTML = `<div class="grid g3" style="margin:8px 0"><div><label class="f">Vốn tài khoản (USD)</label><input type="number" id="plBal" step="1"></div>
+      <div><label class="f">Loại tài khoản Exness</label><select id="plAcc"><option value="cent">Standard Cent (USC)</option><option value="std">Standard / Pro (USD)</option></select></div>
+      <div><label class="f">Rủi ro mỗi lệnh (%)</label><input type="number" id="plRisk" step="0.5"></div></div><div id="plLotOut"></div>`;
+    const b = $('#plBal'), a = $('#plAcc'), r = $('#plRisk');
+    if (!b.value) { b.value = Store.get('plBal', 57); a.value = Store.get('plAcc', 'cent'); r.value = Store.get('plRisk', 1); [b, a, r].forEach(x => x.oninput = () => this.lotCalc()); }
+    const bal = +b.value || 0, acc = a.value, rk = +r.value || 1; Store.set('plBal', bal); Store.set('plAcc', acc); Store.set('plRisk', rk);
+    const P = this.M_.pos, sl = P ? P.r : this.M_.st.datr, per001 = acc === 'cent' ? sl * 0.01 : sl;   // $ lỗ khi chạm SL với 0.01 lot
+    const want = bal * rk / 100, lot = Math.floor(want / per001) / 100, pct = per001 / bal * 100;
+    let verdict;
+    if (lot >= 0.01) verdict = `<b style="color:var(--up)">Vào ${lot.toFixed(2)} lot</b> → chạm SL mất ≈ ${(lot * 100 * per001).toFixed(2)}$ (${(lot * 100 * per001 / bal * 100).toFixed(1)}%), chạm TP lãi ≈ ${(lot * 200 * per001).toFixed(2)}$.`;
+    else if (pct <= 2.5) verdict = `Lot nhỏ nhất 0.01 → chạm SL mất ≈ <b>${per001.toFixed(2)}$ = ${pct.toFixed(1)}%</b> vốn (hơi trên ${rk}% nhưng chấp nhận được) → <b style="color:var(--gold2)">vào 0.01 lot</b>, TP lãi ≈ ${(2 * per001).toFixed(2)}$.`;
+    else verdict = `<b style="color:var(--down)">KHÔNG vào.</b> Lot nhỏ nhất 0.01 đã mất ≈ <b>${per001.toFixed(2)}$ = ${pct.toFixed(0)}%</b> vốn nếu chạm SL${pct >= 100 ? ' — mất hết tài khoản' : ''}. ${acc === 'std' ? `Chuyển sang tài khoản <b>Standard Cent</b> (0.01 lot chỉ mất ≈ ${(sl * 0.01).toFixed(2)}$) hoặc cần vốn ≈ ${Math.ceil(per001 * 100 / rk)}$ để rủi ro ${rk}%.` : `Cần vốn ≈ ${Math.ceil(per001 * 100 / 2.5)}$ trở lên.`}`;
+    $('#plLotOut').innerHTML = `<div class="note" style="font-size:13px">💰 SL ${P ? 'của lệnh đang chạy' : 'hiện tại'} = ${sl.toFixed(1)}$ · 0.01 lot ${acc === 'cent' ? 'Cent' : 'Standard'} chạm SL mất ≈ ${per001.toFixed(2)}$ · muốn rủi ro ${rk}% = ${want.toFixed(2)}$<br>${verdict}
+      <span class="muted" style="font-size:12px"><br>Kiểm tra trên MT5: chuột phải mã vàng → Specification → "Contract size" (Standard: 100 oz/lot; Cent: lãi/lỗ tính bằng cent). Đặt SL/TP ngay khi vào lệnh.</span></div>`;
+  },
+  notify(title, body) {
+    UI.toast('🔔 ' + title + ' — ' + body, 8000);
+    try { if (window.Notification && Notification.permission === 'granted') new Notification(title, { body }); } catch (e) { }
+  },
+  askNotify() {
+    if (!window.Notification) return UI.toast('Trình duyệt không hỗ trợ thông báo');
+    Notification.requestPermission().then(p => UI.toast(p === 'granted' ? 'Đã bật thông báo: có tín hiệu mới sẽ báo ngay (khi trang đang mở)' : 'Bạn đã từ chối thông báo'));
+  },
+  // ---- tự cập nhật mỗi giờ: chạy lại ngay sau khi nến H1 đóng (+90 giây) ----
+  auto() { return $('#plAuto') && $('#plAuto').checked; },
+  schedule() {
+    clearTimeout(this.tm); const info = $('#plAutoInfo');
+    if (!this.auto()) { if (info) info.textContent = 'Đang tắt tự cập nhật'; return; }
+    const now = Date.now(), next = Math.floor(now / 3600e3) * 3600e3 + 3600e3 + 90e3;
+    this.nextAt = next;
+    this.tm = setTimeout(() => { if ($('#plSrc').value === 'live' && (this.H.length || Router.cur === 'plan')) this.run(true); this.schedule(); }, next - now);
+    this.autoInfo();
+  },
+  autoInfo() {
+    const info = $('#plAutoInfo'); if (!info) return;
+    info.innerHTML = (this.lastRun ? `Cập nhật lúc <b>${T.fmt(this.lastRun / 1000, false)}</b> · ` : '') + (this.auto() ? `lần tới ${T.fmt(this.nextAt / 1000, false)} (giờ VN)` : 'tự cập nhật đang tắt');
+  },
+  // ---- ICT trên chart Plan ----
+  show: null,
+  togICT(k) { this.show[k] = !this.show[k]; Store.set('plShow', this.show); $$('#plIctBtns button').forEach(b => b.classList.toggle('on', !!this.show[b.dataset.k])); },
+  ictCard() {
+    const R = this.ictR; if (!R) return '';
+    const S = ICT.summary(R, this.ictB, i => T.fmt(this.ictB[Math.max(0, Math.min(this.ictB.length - 1, i))].t).slice(3), p => f2(p + this.off_));
+    return `<div class="card" style="margin-top:14px"><h4>🧩 Cấu trúc ICT trên H1 (tự động, vẽ trên chart bên dưới)</h4><ul style="margin:6px 0 6px 18px;padding:0;font-size:13.5px">${S.map(x => `<li style="margin:3px 0">${x}</li>`).join('')}</ul>
+      <p class="muted" style="font-size:12.5px;margin:4px 0 0"><b>BOS</b> (nét đứt) = nến đóng cửa phá đỉnh/đáy swing CÙNG chiều xu hướng → xu hướng tiếp diễn. <b>MSS</b> (nét liền, đậm) = phá NGƯỢC chiều xu hướng cũ → dấu hiệu đảo chiều (còn gọi CHoCH). <b>FVG</b> = khoảng trống giữa nến 1 và nến 3; viền đậm = chưa bị lấp, nét đứt giữa = CE (50%). <b>CRT H4</b> = nến H4 thứ 2 quét đỉnh/đáy nến H4 thứ 1 rồi đóng cửa quay lại trong biên → mục tiêu là cạnh đối diện của biên (nét đứt màu), hỏng nếu giá vượt râu quét (nét xám).
+      Cách dùng với phương pháp: chỉ lấy tín hiệu cùng hướng D1. Khi hệ thống báo "chờ RSI H1 cắt 50", ưu tiên vào lệnh nếu giá vừa có MSS/BOS cùng hướng và đang ở trong FVG/CRT cùng hướng — đây là xác nhận thêm, KHÔNG phải luật đã được backtest.</p></div>`;
   },
   copy() { if (!this.text) return; navigator.clipboard.writeText(this.text).then(() => UI.toast('Đã sao chép plan')); },
   toLab() {

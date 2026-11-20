@@ -236,7 +236,12 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
     <div class="grid g3">
       <div><label class="f">Nguồn dữ liệu</label><select id="plSrc"><option value="live">Trực tuyến — PAXG/USDT (Binance) ≈ XAUUSD</option><option value="lab">Dữ liệu đã nạp ở Backtest Lab</option></select></div>
       <div><label class="f">Giá XAUUSD trên sàn của bạn lúc này (tuỳ chọn, để bù chênh lệch)</label><input type="number" id="plOff" step="0.01" placeholder="VD: 3528.40"></div>
-      <div style="display:flex;align-items:flex-end"><button class="btn pri" style="width:100%" onclick="Plan.run()">📅 Tạo plan hôm nay</button></div>
+      <div style="display:flex;align-items:flex-end"><button class="btn pri" style="width:100%" onclick="Plan.run()">📅 Tạo plan / cập nhật ngay</button></div>
+    </div>
+    <div class="row" style="gap:14px;margin-top:10px;align-items:center;font-size:13px">
+      <label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="plAuto"> 🔄 Tự cập nhật mỗi giờ (ngay sau khi nến H1 đóng, khi trang đang mở)</label>
+      <span class="muted" id="plAutoInfo"></span>
+      <button class="btn sm" onclick="Plan.askNotify()">🔔 Bật thông báo khi có tín hiệu</button>
     </div>
   </div>
   <div id="plOut" style="margin-top:14px"></div>
@@ -276,7 +281,11 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
     <span class="sep"></span>
     <button class="btn sm on" id="tgKZ" onclick="Lab.toggle('kz')">Killzone</button>
     <button class="btn sm on" id="tgLv" onclick="Lab.toggle('lv')">Mức thanh khoản</button>
-    <button class="btn sm" id="tgFvg" onclick="Lab.toggle('fvg')">FVG</button>
+    <button class="btn sm" id="tgFvg" onclick="Lab.toggle('fvg')" title="Fair Value Gap: khoảng trống 3 nến">FVG</button>
+    <button class="btn sm" id="tgBos" onclick="Lab.toggle('bos')" title="BOS = phá cấu trúc cùng xu hướng · MSS = phá ngược xu hướng (đảo chiều)">BOS / MSS</button>
+    <button class="btn sm" id="tgCrt" onclick="Lab.toggle('crt')" title="Candle Range Theory trên khung lớn hơn (M5→H1, M15/H1→H4, H4→D1)">CRT</button>
+    <button class="btn sm" id="tgSw" onclick="Lab.toggle('sw')" title="Nhãn đỉnh/đáy HH HL LH LL">HH/LL</button>
+    <select id="ictN" title="Độ nhạy swing: số nến mỗi bên để xác nhận đỉnh/đáy (nhỏ = cấu trúc nội bộ, lớn = cấu trúc chính)" onchange="Store.set('ictN',+this.value);Lab.ictKey=''"><option value="2">Swing 2</option><option value="3" selected>Swing 3</option><option value="5">Swing 5</option><option value="8">Swing 8</option></select>
     <span class="sep"></span>
     <span id="replayInfo">Chưa có dữ liệu</span>
   </div>
@@ -441,6 +450,7 @@ TRƯỚC KHI BẤM LỆNH
 <script src="scenarios.js"></script>
 <script src="figs.js"></script>
 <script src="app.js"></script>
+<script src="ict.js"></script>
 <script src="coach.js"></script>
 <script src="plan.js"></script>
 <script src="data/bt.js"></script>

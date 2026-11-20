@@ -3,4 +3,5 @@ Documents/
 *.mp4
 desktop.ini
 Thumbs.db
-Data/
+/Data/
+__pycache__/

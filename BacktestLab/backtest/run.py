@@ -10,6 +10,10 @@ close5 = t + 300
 ih1, ih4, id1, im15 = mapidx(H1, close5), mapidx(H4, close5), mapidx(D1, close5), mapidx(M15, close5)
 print('bars', N, 'days', len(D1['c']), df.dt.iloc[0], '->', df.dt.iloc[-1], f'{time.time()-T0:.0f}s', flush=True)
 import os; COST = float(os.environ.get('COST', 0.40))
+SLIP = 0.05
+if 'spread' in df and os.environ.get('REALSPREAD', '1') == '1':
+    COST = df['spread'].fillna(df['spread'].median()).values.astype(float) + SLIP   # spread thật của sàn tại nến vào lệnh + trượt giá
+    print('Dùng spread thật: TB', round(float(COST.mean()), 3), flush=True)
 g = lambda A, I, k: np.where(I >= 0, A[k][np.maximum(I, 0)], np.nan)
 # xu hướng
 d_c, d_e20, d_e50, d_e200 = g(D1, id1, 'c'), g(D1, id1, 'e21'), g(D1, id1, 'e50'), g(D1, id1, 'e200')
@@ -176,7 +180,7 @@ for mode in ('mid', 'opp'):
         run(f'E · Phá range Á + thuận H4, SL {"giữa range" if mode == "mid" else "biên đối diện"}, RR {rr}', 'scalp', withTP(p5, rr, lambda s: trH4[s['i']] == s['d']), extra={'k': 'asia'})
 
 # ====================== SWING (giữ 3–5 ngày): xu hướng D1 → kiểm tra H4 → vào H1 ======================
-A1 = H1; n1 = len(A1['c']); t1 = A1['end']
+A1 = H1; n1 = len(A1['c']); t1 = A1['end']; SWAP = float(os.environ.get('SWAP', 0.5))   # $/oz mỗi đêm (ước tính thận trọng; tài khoản swap-free = 0)
 id1h = np.searchsorted(D1['end'], t1, side='right') - 1; ih4h = np.searchsorted(H4['end'], t1, side='right') - 1
 yr1 = pd.to_datetime(t1, unit='s').year.values
 gD = lambda k: np.where(id1h >= 0, D1[k][np.maximum(id1h, 0)], np.nan); gH4 = lambda k: np.where(ih4h >= 0, H4[k][np.maximum(ih4h, 0)], np.nan)
@@ -187,7 +191,8 @@ ex1 = np.r_[False, (A1['e9'][1:] > A1['e21'][1:]) & (A1['e9'][:-1] <= A1['e21'][
 datr = gD('atr')
 def runS(name, sig, maxhold=120, extra=None):
     global ALLN
-    tr = sim(sorted(sig, key=lambda s: s['i']), A1, COST + 0.6, maxhold)   # +0.6$ ước tính phí qua đêm
+    c1 = COST[A1['i1']] if isinstance(COST, np.ndarray) else COST
+    tr = sim(sorted(sig, key=lambda s: s['i']), A1, c1, maxhold, T=A1['end'], swap=SWAP)
     ALLN += len(tr); RES.append(report(name, 'swing', tr, yr1, extra)); return tr
 def swingSig(trig='macd', lo=40, sl_mode='swing', rr=2):
     out = []

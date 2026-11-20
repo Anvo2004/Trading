@@ -35,8 +35,8 @@ def ind(o, h, l, c, v):
                 vma=pd.Series(v).rolling(20, min_periods=1).mean().values)
 
 def htf(df, key):
-    g = df.groupby(key, sort=False)
-    a = pd.DataFrame({'o': g.open.first(), 'h': g.high.max(), 'l': g.low.min(), 'c': g.close.last(), 'v': g.volume.sum(), 'end': g.time.max() + 300, 'first': g.time.min(), 'i0': g.apply(lambda x: x.index[0], include_groups=False), 'i1': g.apply(lambda x: x.index[-1], include_groups=False)})
+    g = df.groupby(key, sort=False); gi = pd.Series(df.index, index=df.index).groupby(df[key], sort=False)
+    a = pd.DataFrame({'o': g.open.first(), 'h': g.high.max(), 'l': g.low.min(), 'c': g.close.last(), 'v': g.volume.sum(), 'end': g.time.max() + 300, 'first': g.time.min(), 'i0': gi.first(), 'i1': gi.last()})
     a = a.sort_values('end').reset_index()
     I = ind(*(a[k].values.astype(float) for k in 'ohlcv')); I.update(end=a.end.values, first=a['first'].values, i0=a.i0.values, i1=a.i1.values, key=a[key].values)
     return I
@@ -45,7 +45,8 @@ def mapidx(H, m5_close):  # index of last CLOSED HTF bar at each M5 close
     return np.searchsorted(H['end'], m5_close, side='right') - 1
 
 # ---------------------------------------------------------------- simulator
-def sim(sig, A, cost, maxhold, flat_nym=None, nym=None, day=None):
+def sim(sig, A, cost, maxhold, flat_nym=None, nym=None, day=None, T=None, swap=0.0, exitarr=None):
+    """cost: số $ hoặc mảng spread theo nến (+trượt giá); swap: $/oz mỗi đêm giữ lệnh; exitarr: (thoát lệnh mua, thoát lệnh bán) theo nến"""
     H, L, C = A['h'], A['l'], A['c']; N = len(C); out = []; busy = -1
     for s in sig:
         i = s['i']
@@ -68,11 +69,14 @@ def sim(sig, A, cost, maxhold, flat_nym=None, nym=None, day=None):
         while k <= end:
             if (L[k] <= sl) if d == 1 else (H[k] >= sl): res = (k, sl, 'SL'); break
             if (k > fill or s.get('kind') != 'lmt') and ((H[k] >= tp) if d == 1 else (L[k] <= tp)): res = (k, tp, 'TP'); break
+            if exitarr is not None and k > fill and exitarr[0 if d == 1 else 1][k]: res = (k, C[k], 'Exit'); break
             if flat_nym is not None and k > fill and nym[k] >= flat_nym and nym[k] < 1020 and nym[fill] < flat_nym: res = (k, C[k], 'Time'); break
             k += 1
         if res is None: res = (end, C[end], 'Time')
         k, px, why = res
-        R = (px - e) * d / r - cost / r
+        c0 = cost[fill] if isinstance(cost, np.ndarray) else cost
+        nights = max(0, int(round((T[k] - T[fill]) / 86400))) if (T is not None and swap) else 0
+        R = (px - e) * d / r - (c0 + swap * nights) / r
         out.append({'i': i, 'f': fill, 'x': k, 'd': d, 'R': round(R, 3), 'why': why, 'tag': s.get('tag', ''), 'r': round(r, 2)})
         busy = k
     return out
@@ -93,6 +97,7 @@ def report(name, group, tr, yr, extra=None):
     S['n_oos'] = int((y >= 2024).sum()) if len(y) else 0
     S['years'] = {int(k): stats([t for t, a in zip(tr, y) if a == k]).get('exp', 0) for k in sorted(set(y.tolist()))} if len(y) else {}
     S['long'] = stats([x for x in tr if x['d'] == 1]).get('exp', 0); S['short'] = stats([x for x in tr if x['d'] == -1]).get('exp', 0); S['nl'] = sum(1 for x in tr if x['d'] == 1)
+    S['ys'] = {int(k): [int((y == k).sum()), round(float(sum(t['R'] for t, a in zip(tr, y) if a == k)), 2)] for k in sorted(set(y.tolist()))} if len(y) else {}
     S['name'] = name; S['group'] = group
     if extra: S.update(extra)
     print(f"{group:6s} {name[:70]:70s} n={S['n']:5d} wr={S.get('wr',0):5.1f} exp={S.get('exp',0):+.3f} pf={S.get('pf',0):5.2f} dd={S.get('dd',0):6.1f} IS={S['is']:+.3f} OOS={S['oos']:+.3f} L={S['long']:+.3f} S={S['short']:+.3f}", flush=True)

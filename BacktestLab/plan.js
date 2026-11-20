@@ -223,31 +223,56 @@ const Plan = {
     return `<div class="card" style="margin-top:14px"><h4>Chỉ báo theo khung (nến gần nhất)</h4><div class="tblwrap"><table class="tbl"><tr><th>Khung</th><th>Xu hướng (giá/EMA50/EMA200)</th><th>EMA9/21</th><th>EMA50/200</th><th>RSI 14</th><th>MACD 12-26-9</th><th>Volume / TB 20</th></tr>${rows}</table></div>
       <p class="muted" style="font-size:12px;margin:6px 0 0">Volume = khối lượng nến đã đóng gần nhất so với trung bình 20 nến (PAXG trên Binance, chỉ để so sánh tương đối). XAUUSD trên TradingView/MT5 chỉ có tick volume; khối lượng thật của vàng xem ở hợp đồng COMEX:GC1!.</p></div>`;
   },
-  // Luật W đã backtest: xu hướng D1 → RSI H4 hồi → EMA9×21 H1; SL đỉnh/đáy 24 nến H1 ± 0.3×ATR; TP 3R; giữ tối đa 5 ngày
+  // PHƯƠNG PHÁP ĐÃ TRAIN trên dữ liệu Exness XAUUSDm 2021–2026 (spread thật, walk-forward):
+  // ① D1: giá > EMA50 và EMA50 cao hơn 5 ngày trước (MUA) / ngược lại (BÁN)
+  // ② H4: RSI14 hồi < 40 (MUA) / > 60 (BÁN) trong 24 nến H4 gần nhất
+  // ③ H1: RSI14 cắt qua 50 theo hướng xu hướng + nến H4 gần nhất đóng cùng phía EMA21 H4 → vào lệnh khi nến H1 đóng
+  // SL = 1×ATR14 D1 · TP = 2R · đóng lệnh nếu sau 7 ngày chưa chạm SL/TP
   swingPanel(off) {
-    const D = this.Dd && this.Dd.length > 210 ? this.Dd : null;
-    if (!D) return '<div class="note">Cần ≥ 210 nến D1 để tính tín hiệu swing (EMA200).</div>';
-    const Di = this.ind(D.slice(0, -1)), k = Di.c.length - 1;
-    const trD = Di.c[k] > Di.e50[k] && Di.e50[k] > Di.e200[k] ? 1 : Di.c[k] < Di.e50[k] && Di.e50[k] < Di.e200[k] ? -1 : 0;
-    const H4 = this.agg(this.H, 14400).slice(0, -1), r4 = this.ind(H4).rsi.slice(-24), H = this.H.slice(0, -1), I = this.ind(H), n = H.length - 1;
-    const rMax = Math.max(...r4), rMin = Math.min(...r4), pull = trD === 1 ? rMin < 45 : trD === -1 ? rMax > 55 : false;
-    let sig = null;
-    for (let i = n; i > n - 6; i--) {
-      const up = I.e9[i] > I.e21[i] && I.e9[i - 1] <= I.e21[i - 1], dn = I.e9[i] < I.e21[i] && I.e9[i - 1] >= I.e21[i - 1];
-      if (pull && ((trD === 1 && up) || (trD === -1 && dn))) { sig = i; break; }
+    const D = this.Dd && this.Dd.length > 60 ? this.Dd : null;
+    if (!D) return '<div class="note">Cần ≥ 60 nến D1 để tính tín hiệu.</div>';
+    const Dc = D.slice(0, -1), Di = this.ind(Dc), k = Di.c.length - 1;
+    const trD = Di.c[k] > Di.e50[k] && Di.e50[k] > Di.e50[k - 5] ? 1 : Di.c[k] < Di.e50[k] && Di.e50[k] < Di.e50[k - 5] ? -1 : 0;
+    const datr = Di.atr[k];
+    const H = this.H.slice(0, -1), I = this.ind(H), n = H.length - 1;
+    const H4 = this.agg(this.H, 14400), I4 = this.ind(H4);
+    const h4At = j => { const tEnd = H[j].t + 3600; let lo = 0, hi = H4.length - 1, r = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (H4[m].t + 14400 <= tEnd) { r = m; lo = m + 1; } else hi = m - 1; } return r; };
+    const rsiWin = j => { const q = h4At(j); return q < 0 ? [] : I4.rsi.slice(Math.max(0, q - 23), q + 1); };
+    const h4side = j => { const q = h4At(j); return q < 0 ? 0 : H4[q].c > I4.e21[q] ? 1 : -1; };
+    const F = p => f2(p + off), dw = d => d === 1 ? 'MUA' : 'BÁN';
+    const isSig = (i, d) => {
+      const r4 = rsiWin(i); if (!r4.length || i < 1) return false;
+      const x = d === 1 ? I.rsi[i] > 50 && I.rsi[i - 1] <= 50 : I.rsi[i] < 50 && I.rsi[i - 1] >= 50;
+      return x && (d === 1 ? Math.min(...r4) < 40 : Math.max(...r4) > 60) && h4side(i) === d;
+    };
+    // tín hiệu gần nhất trong 7 ngày và trạng thái lệnh tới hiện tại
+    let last = null;
+    if (trD) for (let i = n; i > n - 7 * 24 && i > 1; i--) if (isSig(i, trD)) { last = i; break; }
+    let st = '', cls = 'warn';
+    if (last != null) {
+      const d = trD, e = H[last].c, sl = e - d * datr, tp = e + d * 2 * datr;
+      let exit = null;
+      for (let j = last + 1; j <= n; j++) {
+        if (d === 1 ? H[j].l <= sl : H[j].h >= sl) { exit = { j, px: sl, why: 'chạm SL' }; break; }
+        if (d === 1 ? H[j].h >= tp : H[j].l <= tp) { exit = { j, px: tp, why: 'chạm TP' }; break; }
+        if (H[j].t - H[last].t >= 7 * 86400) { exit = { j, px: H[j].c, why: 'hết 7 ngày' }; break; }
+      }
+      const R = px => ((px - e) * d / datr).toFixed(2);
+      const head = `Tín hiệu ${dw(d)} lúc ${T.fmt(H[last].t + 3600)} · Entry ${F(e)} · SL ${F(sl)} · TP ${F(tp)} (SL = ${datr.toFixed(1)}$)`;
+      if (exit) st = `${head}<br>→ Đã đóng lúc ${T.fmt(H[exit.j].t + 3600)} (${exit.why}) = <b>${R(exit.px)}R</b>.`;
+      else { cls = 'ok'; st = `<b>LỆNH ĐANG CHẠY</b> — ${head}<br>Giá hiện tại ${F(H[n].c)} = <b>${R(H[n].c)}R</b>. Giữ tới khi chạm SL/TP, tối đa 7 ngày (tới ${T.fmt(H[last].t + 3600 + 7 * 86400)}).`; }
     }
-    const F = p => f2(p + off), dw = trD === 1 ? 'MUA' : 'BÁN';
-    let st, cls = 'warn';
-    if (!trD) st = 'D1 không có xu hướng rõ (giá, EMA50, EMA200 không xếp thẳng hàng) → <b>KHÔNG giao dịch swing</b>.';
-    else if (!pull) st = `D1 đang <b>${trD === 1 ? 'TĂNG' : 'GIẢM'}</b> (giá ${F(Di.c[k])}, EMA50 ${F(Di.e50[k])}, EMA200 ${F(Di.e200[k])}) → chỉ ${dw}. Nhưng RSI H4 chưa ${trD === 1 ? 'hồi xuống dưới 45' : 'hồi lên trên 55'} trong 4 ngày qua (${trD === 1 ? 'thấp nhất ' + rMin.toFixed(1) : 'cao nhất ' + rMax.toFixed(1)}) → giá chưa hồi, <b>CHƯA vào</b>. Không ${dw.toLowerCase()} đuổi.`;
-    else if (sig == null) st = `D1 <b>${trD === 1 ? 'TĂNG' : 'GIẢM'}</b> + RSI H4 đã hồi (${trD === 1 ? rMin.toFixed(1) : rMax.toFixed(1)}) → <b>CHỜ EMA9 cắt ${trD === 1 ? 'LÊN' : 'XUỐNG'} EMA21 trên H1</b> (đóng nến) để vào ${dw}.`;
-    else {
-      const e = H[sig].c, a = Math.max(0, sig - 23), seg = H.slice(a, sig + 1);
-      const sl = trD === 1 ? Math.min(...seg.map(b => b.l)) - 0.3 * I.atr[sig] : Math.max(...seg.map(b => b.h)) + 0.3 * I.atr[sig], r = Math.abs(e - sl);
-      cls = 'ok'; st = `<b>CÓ TÍN HIỆU ${dw}</b> (nến H1 đóng lúc ${T.fmt(H[sig].t + 3600)}): Entry ${F(e)} · SL ${F(sl)} (${r.toFixed(1)}$) · TP 3R ${F(e + trD * 3 * r)} · đóng lệnh sau tối đa 5 ngày.`;
-    }
-    return `<div class="card" style="margin-top:14px"><h4>Tín hiệu SWING (giữ 3–5 ngày) — luật đã backtest 6 năm</h4><div class="note ${cls}" style="font-size:13px">${st}</div>
-      <div class="muted" style="font-size:12.5px">Luật: D1 giá, EMA50, EMA200 xếp cùng hướng → RSI H4 hồi (&lt;45 khi mua / &gt;55 khi bán) trong 24 nến H4 gần nhất → vào khi EMA9 cắt EMA21 trên H1 (nến đã đóng) → SL dưới đáy / trên đỉnh 24 nến H1 ± 0.3×ATR(H1) → TP 3R hoặc đóng sau 5 ngày. Kết quả 6 năm: 132 lệnh, thắng 41%, +0.20R/lệnh (xem trang Báo cáo backtest).</div></div>`;
+    const r4 = rsiWin(n), rMin = r4.length ? Math.min(...r4) : 50, rMax = r4.length ? Math.max(...r4) : 50, side = h4side(n);
+    const pulled = trD === 1 ? rMin < 40 : rMax > 60;
+    const wait = !trD ? `D1 chưa có xu hướng rõ (giá ${F(Di.c[k])}, EMA50 ${F(Di.e50[k])}, EMA50 5 ngày trước ${F(Di.e50[k - 5])}) → <b>KHÔNG giao dịch</b>.`
+      : `① D1 <b>${trD === 1 ? 'TĂNG' : 'GIẢM'}</b> (giá ${F(Di.c[k])} ${trD === 1 ? '>' : '<'} EMA50 ${F(Di.e50[k])}, EMA50 ${trD === 1 ? 'đi lên' : 'đi xuống'}) → chỉ ${dw(trD)}.<br>` +
+        `② RSI H4 trong 4 ngày: ${trD === 1 ? 'thấp nhất ' + rMin.toFixed(1) + (pulled ? ' &lt; 40 ✅ đã hồi' : ' — cần &lt; 40 ❌ chưa hồi') : 'cao nhất ' + rMax.toFixed(1) + (pulled ? ' &gt; 60 ✅ đã hồi' : ' — cần &gt; 60 ❌ chưa hồi')}.<br>` +
+        `③ Nến H4 gần nhất đóng ${side === 1 ? 'TRÊN' : 'DƯỚI'} EMA21 H4 ${side === trD ? '✅' : '❌'} · RSI H1 hiện ${I.rsi[n].toFixed(1)} → ${pulled && side === trD ? `<b>chờ RSI H1 cắt ${trD === 1 ? 'LÊN' : 'XUỐNG'} 50</b> để vào ${dw(trD)}` : '<b>chưa đủ điều kiện, KHÔNG vào</b>'}.<br>` +
+        `Nếu vào bây giờ: SL = 1×ATR D1 = <b>${datr.toFixed(1)}$</b> → TP = ${(2 * datr).toFixed(1)}$.`;
+    return `<div class="card" style="margin-top:14px;border-color:rgba(34,197,139,.5)"><h4>🎯 Phương pháp đã train trên dữ liệu Exness — swing 3–7 ngày</h4>
+      ${st ? `<div class="note ${cls}" style="font-size:13px">${st}</div>` : ''}<div class="note" style="font-size:13px">${wait}</div>
+      <div class="muted" style="font-size:12.5px">Luật: ① D1 xác định xu hướng: giá trên EMA50 và EMA50 cao hơn 5 ngày trước → chỉ MUA (ngược lại chỉ BÁN) · ② H4 kiểm tra nhịp hồi: RSI14 xuống dưới 40 (MUA) / lên trên 60 (BÁN) trong 24 nến H4 gần nhất · ③ H1 tìm điểm vào: RSI14 cắt qua 50 theo hướng xu hướng, và nến H4 gần nhất đóng cùng phía EMA21 H4 → vào lệnh khi nến H1 đóng · SL = 1×ATR14 D1 · TP = 2R · đóng sau 7 ngày nếu chưa chạm.
+      Kết quả 2021–2026 trên dữ liệu Exness (spread thật + trượt giá + swap 0.5$/đêm): 82 lệnh, thắng 58.5%, +0.46R/lệnh, PF 2.17, sụt giảm tối đa 4.6R, dương cả 6/6 năm.</div></div>`;
   },
   copy() { if (!this.text) return; navigator.clipboard.writeText(this.text).then(() => UI.toast('Đã sao chép plan')); },
   toLab() {

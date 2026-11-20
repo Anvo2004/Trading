@@ -6,12 +6,13 @@ Mở **index.html** bằng Chrome hoặc Edge (nhấp đúp). Lần đầu cần
 |---|---|
 | Tổng quan | Tiến độ + lộ trình 8 tuần + giờ killzone hôm nay |
 | Các chương (8) | Lý thuyết → Tài liệu (PDF/video trong `../Documents`) → Nhiệm vụ thực chiến → Bài kiểm tra (≥ 80%) |
-| Ôn tập trắc nghiệm | 51 câu theo chương, chế độ "Ôn câu sai" |
+| Ôn tập trắc nghiệm | 69 câu theo chương, chế độ "Ôn câu sai" |
 | Kịch bản thực chiến | 24 bài lấy từ file Excel `03_Bo_du_lieu_luyen_tap_XAUUSD.xlsx` |
+| Plan mỗi ngày | Tải giá vàng trực tuyến (PAXG/USDT ≈ XAUUSD, có ô bù chênh lệch) → bias D1, cấu trúc H4, Premium/Discount, mức thanh khoản, vùng S/R → kịch bản chính/phụ, điểm vô hiệu, giờ killzone; tự kiểm tra độ chính xác bias 30 ngày qua |
 | Backtest Lab | Nạp CSV từ TradingView/MT5, tua từng nến, đặt lệnh, tự ghi nhật ký |
 | Huấn luyện (trong Lab) | Replay tự dừng ở điểm cố định (trước killzone, khi quét, khi MSS) → hỏi xu hướng D1/H4, Premium/Discount, mức thanh khoản, yếu tố vào lệnh, vẽ FVG, đặt Entry/SL/TP → chấm điểm và tua tới kết quả |
 | Công cụ vẽ (trong Lab) | Đường ngang, đường xu hướng, vùng chữ nhật, Fibo — phím H / T / R / F, Delete để xóa |
-| Thử nghiệm chiến lược | Chạy tự động Mô hình A (Quét → MSS → FVG) với tham số tuỳ chỉnh |
+| Thử nghiệm chiến lược | Chạy tự động Mô hình A (Quét → MSS → FVG) hoặc Mô hình B (vùng S/R chạm ≥ 2 lần + EMA9 cắt EMA21 + Fibo 50%) với tham số tuỳ chỉnh |
 | Chart TradingView | Chart trực tiếp XAUUSD |
 | Nhật ký & thống kê | Winrate, kỳ vọng R, đường vốn, xuất CSV, sao lưu |
 | Công cụ | Máy tính lot, đổi giờ server MT5, checklist in ra |

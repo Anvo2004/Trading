@@ -540,18 +540,21 @@ const Lab = {
 /* ---------------- Strategy tester: Model A ---------------- */
 const Strat = {
   last: [],
-  defaults: { stKZ: 'ny', stDelay: 30, stBias: 'none', stLv: 'all', stLook: 6, stWait: 12, stEntry: 'ce', stBuf: 1.2, stTP: 'fixed', stRR: 2, stRR2: 4, stMinRR: 2, stMaxSL: 12, stDisp: 1.3, stExit: 12.5, stCost: 0.3 },
+  defaults: { stModel: 'A', stEmaF: 'none', stTol: 1.5, stWait2: 24, stBrk: 3, stSwing: 12, stTouch: 2, stFib: 'half', stFibN: 96, stKZ: 'ny', stDelay: 30, stBias: 'none', stLv: 'all', stLook: 6, stWait: 12, stEntry: 'ce', stBuf: 1.2, stTP: 'fixed', stRR: 2, stRR2: 4, stMinRR: 2, stMaxSL: 12, stDisp: 1.3, stExit: 12.5, stCost: 0.3 },
   init() { const s = Store.get('stParams', this.defaults); Object.entries({ ...this.defaults, ...s }).forEach(([k, v]) => { const el = $('#' + k); if (el) el.value = v; }); },
   reset() { Object.entries(this.defaults).forEach(([k, v]) => $('#' + k).value = v); },
   params() { const p = {}; Object.keys(this.defaults).forEach(k => { const v = $('#' + k).value; p[k] = isNaN(+v) || v === '' ? v : +v; }); Store.set('stParams', p); return p; },
   run() {
     const B = Data.bars; if (!B.length) { UI.toast('Nạp dữ liệu ở Backtest Lab trước'); return; }
-    const P = this.params(), t0 = performance.now();
+    const P = this.params(), t0 = performance.now(); this.lastP = P;
     const KZ = P.stKZ === 'ny' ? [[420, 600]] : P.stKZ === 'ldn' ? [[120, 300]] : [[120, 300], [420, 600]];
     const kzOf = m => KZ.find(([s, e]) => m >= s && m < e);
     const body = B.map(b => Math.abs(b.c - b.o)), cum = [0]; body.forEach((x, i) => cum.push(cum[i] + x));
     const avgBody = i => { const a = Math.max(0, i - 20); return (cum[i] - cum[a]) / ((i - a) || 1); };
     const FN = { sw: 0, mss: 0, fvg: 0, filt: 0, pend: 0, fill: 0 }; const trades = []; let dayK = null, lv = [], setup = null, pos = null, traded = false, bias = 0, D = null, cancels = 0;
+    const MB = P.stModel === 'B', e9 = [], e21 = []; let swl = [], tch = null;
+    B.forEach((b, i) => { e9[i] = i ? b.c * 0.2 + e9[i - 1] * 0.8 : b.c; e21[i] = i ? b.c * (2 / 22) + e21[i - 1] * (20 / 22) : b.c; });
+    const emaOk = (i, d) => d === 1 ? e9[i] > e21[i] : e9[i] < e21[i];
     const exitMin = P.stExit * 60;
     const finish = (i, px, why, extraR = 0, frac = 1) => {
       const r = Math.abs(pos.entry - pos.sl0);
@@ -562,7 +565,7 @@ const Strat = {
       const b = B[i], k = Data.key[i], m = Data.nym[i];
       if (k !== dayK) {
         if (pos && pos.status === 'open') finish(i - 1, B[i - 1].c, 'Hết giờ', pos.partR || 0, pos.partR ? 0.5 : 1);
-        pos = null; setup = null; traded = false; dayK = k; D = Data.days[k]; lv = [];
+        pos = null; setup = null; tch = null; traded = false; dayK = k; D = Data.days[k]; lv = [];
         const pd = Data.prev(k);
         bias = 0;
         if (pd && P.stBias === 'prev') bias = pd.c > pd.o ? 1 : -1;
@@ -591,7 +594,7 @@ const Strat = {
         }
       }
       // ---- detect setups
-      if (!pos && !traded && setup) {
+      if (!MB && !pos && !traded && setup) {
         const d = setup.dir; setup.n++;
         setup.ext = d === 1 ? Math.min(setup.ext, b.l) : Math.max(setup.ext, b.h);
         const brk = d === 1 ? b.c > setup.mss : b.c < setup.mss;
@@ -610,12 +613,53 @@ const Strat = {
               const cand = lv.filter(L => !L.taken && L.s === d && (L.p - entry) * d > 0).sort((a, b2) => (a.p - b2.p) * d);
               const c0 = cand.find(L => Math.abs(L.p - entry) / r >= P.stMinRR); if (c0) { tp = c0.p; tpn = c0.n; }
             } else { tp = entry + d * P.stRR * r; tp2 = entry + d * P.stRR2 * r; }
-            const ok = tp != null && r > 0.05 && (!P.stMaxSL || r <= P.stMaxSL) && (d === 1 ? b.c > entry : b.c < entry);
+            const ok = tp != null && r > 0.05 && (!P.stMaxSL || r <= P.stMaxSL) && (d === 1 ? b.c > entry : b.c < entry) && (P.stEmaF !== 'm5' || emaOk(i, d));
             if (!ok) FN.filt++; else FN.pend++;
             if (ok) pos = { dir: d, status: 'pending', entry: +entry.toFixed(2), sl: +sl.toFixed(2), sl0: +sl.toFixed(2), tp: +tp.toFixed(2), tp2: tp2 && +tp2.toFixed(2), tpn, lvl: setup.lvl, tSweep: setup.t, tMSS: b.t, kz: kz && kz[0] === 120 ? 'London' : 'NY AM', dow: D.dow, fvg: F };
           }
           setup = null;
         } else if (setup.n > P.stWait) setup = null;
+      }
+      // ---- Mô hình B: chạm vùng hỗ trợ/kháng cự → EMA9 cắt EMA21 (video EMA 9/21)
+      if (MB) {
+        const S = P.stSwing;
+        if (S > 0 && i >= 2 * S) {
+          const c = i - S; let isH = true, isL = true;
+          for (let j = c - S; j <= c + S && (isH || isL); j++) { if (j === c) continue; if (B[j].h >= B[c].h) isH = false; if (B[j].l <= B[c].l) isL = false; }
+          if (isH) swl.push({ n: 'Đỉnh swing', p: B[c].h, t: B[c].t }); if (isL) swl.push({ n: 'Đáy swing', p: B[c].l, t: B[c].t });
+          if (swl.length > 60) swl = swl.filter(x => b.t - x.t < 3 * 86400);
+        }
+        if (!pos && !traded && tch) {
+          const d = tch.dir; tch.n++; tch.ext = d === 1 ? Math.min(tch.ext, b.l) : Math.max(tch.ext, b.h);
+          const brk = d === 1 ? b.c < tch.L.p - P.stBrk : b.c > tch.L.p + P.stBrk;
+          const cross = d === 1 ? e9[i - 1] <= e21[i - 1] && e9[i] > e21[i] : e9[i - 1] >= e21[i - 1] && e9[i] < e21[i];
+          if (brk || tch.n > P.stWait2 || !kz) tch = null;
+          else if (cross && (d === 1 ? b.c > tch.L.p : b.c < tch.L.p)) {
+            FN.mss++;
+            const entry = b.c, sl = d === 1 ? tch.ext - P.stBuf : tch.ext + P.stBuf, r = Math.abs(entry - sl);
+            let tp = null, tp2 = null, tpn = '';
+            if (P.stTP === 'liq') { const c0 = lv.filter(L => !L.taken && L.s === d && (L.p - entry) * d / r >= P.stMinRR).sort((a, b2) => (a.p - b2.p) * d)[0]; if (c0) { tp = c0.p; tpn = c0.n; } }
+            else if (P.stTP === 'swing') { const c0 = swl.filter(x => (x.p - entry) * d / r >= P.stMinRR).sort((a, b2) => (a.p - b2.p) * d)[0]; if (c0) { tp = c0.p; tpn = c0.n; } }
+            else { tp = entry + d * P.stRR * r; tp2 = entry + d * P.stRR2 * r; }
+            let fibOk = true;
+            if (P.stFib === 'half') { let hi = -Infinity, lo = Infinity; for (let j = Math.max(0, tch.i - P.stFibN); j <= tch.i; j++) { hi = Math.max(hi, B[j].h); lo = Math.min(lo, B[j].l); } fibOk = d === 1 ? entry < (hi + lo) / 2 : entry > (hi + lo) / 2; }
+            if (tp != null && fibOk && r > 0.05 && (!P.stMaxSL || r <= P.stMaxSL)) {
+              FN.fill++; traded = true;
+              pos = { dir: d, status: 'open', entry: +entry.toFixed(2), sl: +sl.toFixed(2), sl0: +sl.toFixed(2), tp: +tp.toFixed(2), tp2: tp2 && +tp2.toFixed(2), tpn, lvl: tch.L.n, tSweep: B[tch.i].t, tMSS: b.t, tFill: b.t, kz: kz[0] === 120 ? 'London' : 'NY AM', dow: D.dow };
+            } else FN.filt++;
+            tch = null;
+          }
+        }
+        if (!pos && !traded && !tch && active) {
+          let best = null;
+          const strong = swl.filter(x => swl.filter(y => Math.abs(y.p - x.p) <= P.stTol * 1.5).length >= P.stTouch);
+          for (const L of lv.concat(strong)) {
+            const pc = B[i - 1].c;
+            if (pc > L.p && b.l <= L.p + P.stTol && (bias === 0 || bias === 1)) { const dd = Math.abs(pc - L.p); if (!best || dd < best.dd) best = { L, dir: 1, dd }; }
+            if (pc < L.p && b.h >= L.p - P.stTol && (bias === 0 || bias === -1)) { const dd = Math.abs(pc - L.p); if (!best || dd < best.dd) best = { L, dir: -1, dd }; }
+          }
+          if (best) { FN.sw++; tch = { L: best.L, dir: best.dir, ext: best.dir === 1 ? b.l : b.h, i, n: 0 }; }
+        }
       }
       for (const L of lv) {
         if (L.taken) continue;
@@ -623,7 +667,7 @@ const Strat = {
         if (!hit) continue;
         L.taken = true;
         const dir = -L.s;
-        if (active && !pos && !traded && !setup && (bias === 0 || bias === dir)) {
+        if (!MB && active && !pos && !traded && !setup && (bias === 0 || bias === dir)) {
           let mss = dir === 1 ? -Infinity : Infinity;
           for (let j = Math.max(0, i - P.stLook); j < i; j++) mss = dir === 1 ? Math.max(mss, B[j].h) : Math.min(mss, B[j].l);
           FN.sw++; setup = { dir, lvl: L.n, ext: dir === 1 ? b.l : b.h, mss, i, t: b.t, n: 0 };
@@ -642,7 +686,7 @@ const Strat = {
     out.innerHTML = (Data.synthetic ? '<div class="note warn" style="margin-top:14px">Bạn đang chạy trên <b>dữ liệu mô phỏng ngẫu nhiên</b>. Kết quả gần 0 hoặc âm là bình thường: dữ liệu ngẫu nhiên không có thanh khoản thật. Hãy nạp dữ liệu XAUUSD thật để kiểm chứng.</div>' : '') +
       `<div class="grid g4" style="margin-top:14px">${Stats.kpis(S)}</div>
       ${FN ? `<div class="card" style="margin-top:14px"><h4>Phễu lọc setup</h4><div class="row mono" style="gap:6px;font-size:13px">
-        <span class="pill">${FN.sw} cú quét trong KZ</span>→<span class="pill">${FN.mss} MSS có displacement</span>→<span class="pill">${FN.fvg} có FVG</span>→<span class="pill">${FN.pend} lệnh chờ (${FN.filt} bị loại: RR/SL quá lớn)</span>→<span class="pill gold">${FN.fill} khớp</span></div>
+        ${P.stModel === 'B' ? `<span class="pill">${FN.sw} lần chạm vùng S/R</span>→<span class="pill">${FN.mss} EMA9 cắt EMA21 đúng hướng</span>→<span class="pill">${FN.filt} bị loại (SL rộng / chưa hồi quá 50% Fibo / không có TP đủ RR)</span>→<span class="pill gold">${FN.fill} vào lệnh</span>` : `<span class="pill">${FN.sw} cú quét trong KZ</span>→<span class="pill">${FN.mss} MSS có displacement</span>→<span class="pill">${FN.fvg} có FVG</span>→<span class="pill">${FN.pend} lệnh chờ (${FN.filt} bị loại: RR/SL${P.stEmaF === 'm5' ? '/EMA' : ''})</span>→<span class="pill gold">${FN.fill} khớp</span>`}</div>
         <p class="muted" style="font-size:12.5px;margin:8px 0 0">Bước nào rơi nhiều nhất là bộ lọc khắt khe nhất. Nới lỏng thử (VD: giảm "Displacement", tăng "Tối đa nến chờ MSS") để xem kỳ vọng thay đổi thế nào — nhưng cẩn thận tối ưu quá mức.</p></div>` : ''}
       ${S.n < 30 ? '<div class="note warn">Ít hơn 30 lệnh: mẫu quá nhỏ để kết luận. Nạp thêm dữ liệu.</div>' : ''}
       <div class="card" style="margin-top:14px"><h4>Đường vốn (R tích lũy, đã trừ chi phí)</h4><svg class="eq" id="stEq"></svg></div>
@@ -985,7 +1029,7 @@ const Router = {
 
 /* ---------------- Boot ---------------- */
 window.addEventListener('DOMContentLoaded', () => {
-  Coach.init(); Lab.init(); Strat.init(); Quiz.init(); Scen.init(); Tools.init();
+  Coach.init(); Lab.init(); Strat.init(); Plan.init(); Quiz.init(); Scen.init(); Tools.init();
   Tools.tick(); setInterval(() => Tools.tick(), 30000);
   window.addEventListener('hashchange', () => Router.go()); Router.go();
   document.addEventListener('keydown', e => { if (e.key === 'Escape') UI.close(); });

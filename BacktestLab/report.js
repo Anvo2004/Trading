@@ -26,8 +26,33 @@ const Report = {
       <div class="card" style="margin-top:14px"><h4>Tham số nào thực sự quan trọng? (kỳ vọng trung bình trên mọi tổ hợp)</h4><table class="tbl">${mg}</table></div>`;
     UI.eq($('#optEq'), (() => { let s = 0; return O.pick_trades.map(x => s += x[3]); })());
   },
+  renderMTF() {
+    const X = window.MTF, el = $('#rpMtf'); if (!el || !X) return;
+    const TFS = ['H4', 'H1', 'M15', 'M5'].filter(k => X[k]), cls = v => v > 0.05 ? 'pos' : v < -0.05 ? 'neg' : '';
+    const chain = { H4: 'D1 → H4 → H4', H1: 'D1 → H4 → H1', M15: 'D1/H4 → H1 → M15', M5: 'D1/H4/H1 → M15 → M5' };
+    const verdict = r => { const w = r.wf.oos_exp, p = r.pick; if (w > 0.15 && p && p.exp > 0.15) return '<span class="pill up">Có lợi thế</span>'; if (w > 0.03) return '<span class="pill gold">Yếu / chưa chắc</span>'; if (w > -0.05) return '<span class="pill gold">Chưa chứng minh được</span>'; return '<span class="pill down">Không có lợi thế</span>'; };
+    const tot = TFS.reduce((s, k) => s + X[k].n_trades_total, 0), cmb = TFS.reduce((s, k) => s + X[k].n_combos, 0);
+    const rows = TFS.map(k => { const r = X[k], p = r.pick; return `<tr><td><b>${k}</b></td><td class="mono" style="font-size:12px">${chain[k]}</td><td class="mono">${r.n_combos.toLocaleString()}</td><td class="mono">${r.n_trades_total.toLocaleString()}</td><td class="mono ${r.pct_positive >= 50 ? 'pos' : 'neg'}">${r.pct_positive}%</td>
+      <td class="mono ${cls(r.wf.oos_exp)}"><b>${fR(r.wf.oos_exp)}</b>/lệnh<br><span class="muted">${r.wf.oos_n} lệnh, ${r.wf.oos_R >= 0 ? '+' : ''}${r.wf.oos_R}R</span></td>
+      <td class="mono">${p ? `${p.n} lệnh · ${p.wr}% · <b class="${cls(p.exp)}">${fR(p.exp)}</b><br><span class="muted">dương ${p.pos_years || 0}/${Object.keys(p.ys).length} năm · PF ${p.pf}</span>` : '—'}</td>
+      <td class="mono">${r.pick_risk_med ? r.pick_risk_med + '$' : '—'}${r.pick_cost_R != null ? `<br><span class="muted">phí ≈ ${r.pick_cost_R}R</span>` : ''}</td><td>${verdict(r)}</td></tr>`; }).join('');
+    const det = TFS.map(k => { const r = X[k], p = r.pick; if (!p) return '';
+      const mg = Object.entries(r.marg).map(([a, v]) => `<tr><td>${{ trend: 'Xu hướng', lo: 'Ngưỡng RSI hồi', win: 'Cửa sổ hồi', trig: 'Tín hiệu vào', sl: 'Kiểu SL', ex: 'Thoát lệnh', hold: 'Giữ tối đa (ngày)', mf: 'Lọc EMA21 khung giữa', sess: 'Giờ vào lệnh' }[a] || a}</td><td>${Object.entries(v).map(([q, b]) => `<span class="pill ${b > 0 ? 'up' : 'down'}" style="margin:2px">${esc(q.replace(/[()']/g, '').replace('true', 'có').replace('false', 'không').replace('ldn_ny', 'London→NY').replace('kz', 'killzone').replace('all', 'mọi giờ'))}: ${fR(b)}</span>`).join(' ')}</td></tr>`).join('');
+      return `<details class="card" style="margin-top:10px"><summary style="cursor:pointer"><b>${k}</b> — chi tiết phương pháp tốt nhất, walk-forward và tham số quan trọng</summary>
+        <p style="margin:8px 0"><b>${esc(p.name)}</b></p>
+        <div class="row mono" style="gap:12px;font-size:13px"><span>${p.n} lệnh</span><span>thắng ${p.wr}%</span><span class="${cls(p.exp)}">${fR(p.exp)}/lệnh</span><span>PF ${p.pf}</span><span>sụt giảm ${p.dd}R</span><span>thua liên tiếp ${p.ms}</span><span>Mua ${fR(p.long)} · Bán ${fR(p.short)}</span>${p.neighbors_pos_pct != null ? `<span>${p.neighbors_pos_pct}% hàng xóm dương</span>` : ''}${r.pick_hold_med_h ? `<span>giữ TB ${r.pick_hold_med_h} giờ</span>` : ''}</div>
+        <div class="row" style="gap:6px;margin-top:8px">${Object.entries(p.ys).map(([y, v]) => `<span class="pill ${v[1] > 0 ? 'up' : 'down'}">${y}: ${v[0]} lệnh, ${v[1] >= 0 ? '+' : ''}${v[1]}R</span>`).join('')}</div>
+        ${r.pick_trades ? `<svg class="eq" id="mtfEq${k}" style="margin-top:8px"></svg>` : ''}
+        <table class="tbl" style="margin-top:10px"><tr><th>Năm kiểm tra</th><th>Train trên</th><th>Cấu hình máy chọn</th><th>Lệnh</th><th>Kết quả năm chưa thấy</th></tr>${r.wf.folds.map(f => `<tr><td>${f.test}</td><td>${f.train}</td><td style="font-size:12px">${esc(f.pick)}</td><td class="mono">${f.test_n}</td><td class="mono ${cls(f.test_exp)}">${fR(f.test_exp)} (${f.test_R >= 0 ? '+' : ''}${f.test_R}R)</td></tr>`).join('')}</table>
+        <table class="tbl" style="margin-top:10px">${mg}</table></details>`; }).join('');
+    el.innerHTML = `<h2>So sánh khung vào lệnh: H4 · H1 · M15 · M5</h2>
+      <p class="muted" style="margin:-4px 0 10px">Cùng logic "xu hướng khung lớn → nhịp hồi RSI khung giữa → tín hiệu vào ở khung nhỏ", thử ${cmb.toLocaleString()} tổ hợp tham số = <b>${tot.toLocaleString()} lệnh mô phỏng</b> trên dữ liệu tick Exness 2021–2026 (spread thật + 0.05$ trượt giá + swap). M15/M5 thử thêm bộ lọc giờ (mọi giờ / killzone / London→NY).</p>
+      <div class="tblwrap"><table class="tbl"><tr><th>Khung vào</th><th>Xu hướng → hồi → vào</th><th>Tổ hợp</th><th>Lệnh mô phỏng</th><th>% tổ hợp có lãi</th><th>Walk-forward (năm chưa thấy)</th><th>Cấu hình ổn định nhất</th><th>SL trung vị</th><th>Kết luận</th></tr>${rows}</table></div>
+      <p class="muted" style="font-size:12.5px">Đọc bảng: cột <b>walk-forward</b> là quan trọng nhất — máy chọn tham số chỉ bằng các năm trước rồi trade năm sau. "% tổ hợp có lãi" thấp nghĩa là khung đó gần như ngẫu nhiên sau phí; khi đó cấu hình "tốt nhất" nhiều khả năng chỉ ăn may. Hàng H1 ở đây dùng lưới nhỏ hơn (SL theo ATR H4); phương pháp H1 chính ở phía trên dùng SL theo ATR D1 và cho walk-forward tốt hơn (+0.57R).</p>${det}`;
+    TFS.forEach(k => { const r = X[k]; if (r.pick_trades && $('#mtfEq' + k)) { let s = 0; UI.eq($('#mtfEq' + k), r.pick_trades.map(x => s += x[3])); } });
+  },
   render() {
-    this.renderOpt();
+    this.renderOpt(); this.renderMTF();
     const B = window.BT, el = $('#rpOut'); if (!el) return;
     if (!B) { el.innerHTML = '<div class="note bad">Chưa có dữ liệu báo cáo.</div>'; return; }
     const R = B.rows.filter(r => this.grp === 'all' || r.group === this.grp).slice().sort((a, b) => (b[this.sort] ?? -9) - (a[this.sort] ?? -9));

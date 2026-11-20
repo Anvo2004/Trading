@@ -1,6 +1,8 @@
 """Cập nhật dữ liệu Exness mới nhất → train lại (opt.py, walk-forward) → xuất data/opt.js cho trang Báo cáo.
 Dùng:  python update.py            (chỉ cập nhật trên máy)
-       python update.py --push     (cập nhật + commit + push data/opt.js lên GitHub để web tự đổi)
+       python update.py --push     (cập nhật + commit + push data/opt.js, data/mtf.js lên GitHub để web tự đổi)
+       python update.py --no-mtf   (bỏ qua train đa khung H4/H1/M15/M5, ~1–1.5 giờ)
+       python update.py --export-only   (chỉ xuất lại data/mtf.js từ các file Data/mtf_*.json đã có)
 Được Task Scheduler gọi mỗi tuần (xem README trong báo cáo). Dữ liệu gốc ở D:/VoNguyenAn/TRADING/Data (không đẩy lên GitHub).
 """
 import os, sys, json, time, subprocess, datetime
@@ -17,6 +19,16 @@ def run(args):
     LOG.write(p.stdout[-4000:] + p.stderr[-4000:]); LOG.flush()
     if p.returncode: raise SystemExit(f'Lỗi khi chạy {args[1]}: {p.stderr[-800:]}')
     return p.stdout
+
+def export_mtf():
+    out = {}
+    for tf in ('H4', 'H1', 'M15', 'M5'):
+        f = os.path.join(DATA, f'mtf_{tf}.json')
+        if os.path.exists(f): out[tf] = json.load(open(f, encoding='utf-8'))
+    out['updated'] = time.strftime('%Y-%m-%d %H:%M')
+    open(os.path.join(SITE, 'data', 'mtf.js'), 'w', encoding='utf-8').write('window.MTF = ' + json.dumps(out, ensure_ascii=False) + ';\n')
+    log('Đã xuất data/mtf.js:', ', '.join(f"{k} WF {v['wf']['oos_exp']:+.3f}R" for k, v in out.items() if k != 'updated'))
+if '--export-only' in sys.argv: export_mtf(); raise SystemExit
 
 T0 = time.time()
 # 1) tải lại tháng gần nhất (file tháng hiện tại trong kho Exness được bổ sung mỗi ngày) + các tháng mới
@@ -43,10 +55,16 @@ P = r['pick']; changed = old and old != P['name']
 log(f"Xong: {P['n']} lệnh, {P['exp']:+.3f}R/lệnh, walk-forward {r['wf']['oos_exp']:+.3f}R ({r['wf']['oos_n']} lệnh)",
     '· PHƯƠNG PHÁP ĐỔI: ' + P['name'] if changed else '· phương pháp giữ nguyên', f'({time.time() - T0:.0f}s)')
 
-# 3) đẩy lên GitHub để web cập nhật
+# 3) train đa khung (khung vào lệnh H4 / H1 / M15 / M5)
+if '--no-mtf' not in sys.argv:
+    for tf in ('H4', 'H1', 'M15', 'M5'):
+        log('Train đa khung', tf, '…'); out = run([PY, 'mtf.py', CSV, tf, os.path.join(DATA, f'mtf_{tf}.json')]); log(out.strip().splitlines()[-1][:300])
+    export_mtf()
+
+# 4) đẩy lên GitHub để web cập nhật
 if '--push' in sys.argv:
     g = lambda *a: subprocess.run(['git', *a], cwd=SITE, capture_output=True, text=True, encoding='utf-8')
-    g('add', 'data/opt.js')
+    g('add', 'data/opt.js', 'data/mtf.js')
     if g('diff', '--cached', '--quiet').returncode:
         msg = f"Tự động train lại trên dữ liệu Exness tới {time.strftime('%d/%m/%Y')}"
         c = g('commit', '-m', msg); p = g('push')

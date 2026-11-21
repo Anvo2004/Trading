@@ -71,7 +71,7 @@ const Live = {
     const notes = D.notes.slice().reverse().slice(1, this.more ? 240 : 24);
     el.innerHTML = `
       <div class="row muted" style="gap:12px;font-size:12.5px;margin-bottom:8px"><span>Bot cập nhật lúc <b style="color:var(--text)">${T.fmt(D.updated)}</b> (${age} phút trước) · tự chạy mỗi giờ, 24/7</span><span>Nguồn: ${esc(D.src)}</span><button class="btn sm" onclick="Live.load()">↻ Tải lại</button><button class="btn sm" onclick="Plan.askNotify()">🔔 Bật thông báo</button></div>
-      ${age > 150 ? '<div class="note warn" style="font-size:12.5px">Nhận định đã cũ hơn 2 giờ — có thể thị trường đang đóng cửa (cuối tuần) hoặc GitHub đang chậm.</div>' : ''}
+      ${age > 90 ? `<div class="note warn" style="font-size:13px">Nhận định đã cũ ${age >= 120 ? Math.floor(age / 60) + ' giờ' : age + ' phút'} — máy chủ GitHub đôi khi chạy trễ hoặc bỏ lượt${new Date().getUTCDay() === 6 || new Date().getUTCDay() === 0 ? ' (cuối tuần thị trường đóng cửa nên giá không đổi)' : ''}. Muốn tính ngay bằng dữ liệu trực tiếp: <a href="#plan" onclick="setTimeout(() => Plan.run(), 300)"><b>mở 📅 Plan và cập nhật</b></a> — cùng phương pháp, tính trên trình duyệt của bạn.</div>` : ''}
       <div class="card" style="border-color:rgba(232,184,74,.5)"><div class="muted" style="font-size:12.5px;margin-bottom:6px">Nhận định mới nhất · dữ liệu tới ${T.fmt(n.t)} · giá ${f2(n.px)} (PAXG ≈ XAUUSD, lệch vài $)</div>${note(n, true)}</div>
       ${this.setups()}
       <div class="grid g2" style="margin-top:14px">

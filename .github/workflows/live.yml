@@ -3,7 +3,7 @@
 name: Nhan dinh theo gio
 on:
   schedule:
-    - cron: '4 * * * *'     # phút thứ 4 mỗi giờ (sau khi nến H1 đóng); GitHub có thể chạy trễ vài-chục phút
+    - cron: '17,47 * * * *'   # 2 lần/giờ, tránh đầu giờ (GitHub hay bỏ lịch chạy lúc đầu giờ khi đông); chạy trùng không sao
   workflow_dispatch:         # cho phép bấm chạy tay trong tab Actions
 permissions:
   contents: write

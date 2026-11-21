@@ -10,6 +10,7 @@ sys.stdout.reconfigure(encoding='utf-8'); sys.stderr.reconfigure(encoding='utf-8
 HERE = os.path.dirname(os.path.abspath(__file__)); SITE = os.path.dirname(HERE); ROOT = os.path.dirname(SITE)
 DATA = os.path.join(ROOT, 'Data'); PARTS = os.path.join(DATA, '_XAUUSDm_parts'); PY = sys.executable
 CSV, OPT, SCALP = os.path.join(DATA, 'XAUUSDm_M5_exness.csv'), os.path.join(DATA, 'opt_exness.json'), os.path.join(DATA, 'scalp_exness.json')
+os.makedirs(DATA, exist_ok=True)
 LOG = open(os.path.join(DATA, 'update.log'), 'a', encoding='utf-8')
 def log(*a):
     s = f'[{datetime.datetime.now():%Y-%m-%d %H:%M}] ' + ' '.join(map(str, a)); print(s, flush=True); LOG.write(s + '\n'); LOG.flush()
@@ -47,7 +48,9 @@ out = run([PY, 'exness_ticks.py', DATA, 'XAUUSDm', start, time.strftime('%Y-%m')
 log(out.strip().splitlines()[-1] if out.strip() else 'không có dòng nào')
 
 # 2) train lại toàn bộ lưới tham số + walk-forward
-old = json.load(open(OPT, encoding='utf-8'))['pick']['name'] if os.path.exists(OPT) else None
+OLDJS = os.path.join(SITE, 'data', 'opt.js')   # bản đang trên web (dùng khi chạy trên máy chủ GitHub, không có file json cũ)
+oldjs = json.loads(open(OLDJS, encoding='utf-8').read().strip()[len('window.OPT = '):].rstrip(';')) if os.path.exists(OLDJS) else {}
+old = oldjs.get('pick', {}).get('name')
 log('Train lại opt.py …')
 run([PY, 'opt.py', CSV, OPT, SCALP])
 r = json.load(open(OPT, encoding='utf-8'))
@@ -55,6 +58,8 @@ keep = ('name', 'n', 'wr', 'exp', 'pf', 'dd', 'ms', 'pos_years', 'worst_year', '
 r['stable_top'] = [{k: x.get(k) for k in keep} for x in r['stable_top']]
 r['top'] = [{k: x.get(k) for k in keep} for x in r['top']]
 r['updated'] = time.strftime('%Y-%m-%d %H:%M'); r['prev_pick'] = old
+for k in ('scalp_wf', 'scalp_total', 'scalp_rows', 'scalp_now'):      # kết quả scalp (chỉ chạy trên máy cá nhân) → giữ bản cũ
+    if k not in r and k in oldjs: r[k] = oldjs[k]
 open(os.path.join(SITE, 'data', 'opt.js'), 'w', encoding='utf-8').write('window.OPT = ' + json.dumps(r, ensure_ascii=False) + ';\n')
 P = r['pick']; changed = old and old != P['name']
 log(f"Xong: {P['n']} lệnh, {P['exp']:+.3f}R/lệnh, walk-forward {r['wf']['oos_exp']:+.3f}R ({r['wf']['oos_n']} lệnh)",
@@ -73,6 +78,6 @@ if '--push' in sys.argv:
     g('add', 'data/opt.js', 'data/mtf.js', 'data/refine.js')
     if g('diff', '--cached', '--quiet').returncode:
         msg = f"Tự động train lại trên dữ liệu Exness tới {time.strftime('%d/%m/%Y')}"
-        c = g('commit', '-m', msg); p = g('push')
+        c = g('commit', '-m', msg); g('pull', '--rebase'); p = g('push')
         log('git commit/push:', 'OK' if not c.returncode and not p.returncode else (c.stderr + p.stderr)[-500:])
     else: log('opt.js không đổi, không push')

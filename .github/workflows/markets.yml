@@ -1,0 +1,80 @@
+# Kiểm tra phương pháp gốc của vàng trên nhiều thị trường (dữ liệu tick Exness), mỗi thị trường 1 máy chủ GitHub chạy song song.
+# Kết quả gộp vào BacktestLab/data/markets.js. Chạy lại mỗi Chủ nhật để cập nhật dữ liệu mới.
+name: Kiem tra da thi truong
+on:
+  push:
+    paths: ['BacktestLab/backtest/markets.py', '.github/workflows/markets.yml']
+  schedule:
+    - cron: '0 4 * * 0'       # Chủ nhật 11:00 giờ VN
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+concurrency:
+  group: markets
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 9
+      matrix:
+        sym: [XAUUSDm, XAGUSDm, EURUSDm, GBPUSDm, USDJPYm, AUDUSDm, USDCADm, EURJPYm, GBPJPYm, BTCUSDm, ETHUSDm, USTECm, US30m, US500m, USOILm, UKOILm, DE30m, JP225m]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: BacktestLab/backtest
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -q numpy pandas
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/data/_${{ matrix.sym }}_parts
+          key: parts-${{ matrix.sym }}-${{ github.run_id }}
+          restore-keys: parts-${{ matrix.sym }}-
+      - name: Tải tick Exness → nến M5
+        run: |
+          rm -f /tmp/data/_${{ matrix.sym }}_parts/$(date -u +%Y_%m).csv
+          python BacktestLab/backtest/exness_ticks.py /tmp/data ${{ matrix.sym }} 2020-01 $(date -u +%Y-%m) | tail -n 3
+      - name: Áp phương pháp gốc
+        run: mkdir -p /tmp/out && python BacktestLab/backtest/markets.py /tmp/data/${{ matrix.sym }}_M5_exness.csv ${{ matrix.sym }} /tmp/out/${{ matrix.sym }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mk-${{ matrix.sym }}
+          path: /tmp/out/${{ matrix.sym }}.json
+  merge:
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mk-*
+          merge-multiple: true
+          path: /tmp/mk
+      - name: Gộp kết quả → data/markets.js
+        run: |
+          python - <<'EOF'
+          import json, glob, time
+          out = {}
+          for f in sorted(glob.glob('/tmp/mk/*.json')):
+              d = json.load(open(f, encoding='utf-8')); out[d['sym']] = d
+          res = {'updated': time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime()), 'markets': out}
+          open('BacktestLab/data/markets.js', 'w', encoding='utf-8').write('window.MK = ' + json.dumps(res, ensure_ascii=False) + ';\n')
+          print(len(out), 'thị trường')
+          EOF
+      - name: Commit + push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add BacktestLab/data/markets.js
+          git diff --cached --quiet && exit 0
+          git commit -q -m "Cập nhật kiểm tra đa thị trường $(date -u +%Y-%m-%d)"
+          git pull -q --rebase && git push -q
+      - name: Build lại web
+        continue-on-error: true
+        run: curl -s -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" https://api.github.com/repos/${{ github.repository }}/pages/builds

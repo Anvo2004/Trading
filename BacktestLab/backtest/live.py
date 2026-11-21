@@ -137,6 +137,47 @@ def h4_method(Hall, D):
         if exit_check(pos, b, b['t'] + 3600, trades): pos = None
     return trades, pos, st
 
+# ---------------- Entry M15 (nâng cao, refine.py: 97 lệnh, +1.05R/lệnh, thắng 32%, 6/6 năm) ----------------
+def m15_entry(sig, now_t):
+    """Sau tín hiệu H1: trong 24h, chờ EMA9 M15 hồi qua EMA21 rồi cắt lại theo hướng tín hiệu → vào ở giá đóng nến M15.
+    SL = đáy (đỉnh) nhịp hồi − 0.3×ATR M15, tối thiểu 0.2×ATR D1; TP = TP gốc của tín hiệu; tối đa 7 ngày; bỏ nếu chạm SL/TP gốc trước."""
+    d, p0, r0, ts = sig['d'], sig['e'], sig['r'], sig['t']; sl0, tp0 = p0 - d * r0, p0 + 2 * d * r0
+    try: B = binance('15m', 1000)
+    except Exception as e: return {'st': 'error', 'msg': str(e)}
+    B = [b for b in B if b['t'] + 900 <= now_t]          # chỉ nến M15 đã đóng
+    if not B or B[-1]['t'] + 900 < ts: return {'st': 'nodata'}
+    I = ind(B); pulled = False; ext = p0; W = ts + 24 * 3600; out = {'st': 'waiting', 'sig_t': ts, 'd': d, 'p0': p0, 'sl0': round(sl0, 2), 'tp0': round(tp0, 2)}
+    for k, b in enumerate(B):
+        end = b['t'] + 900
+        if end <= ts: continue
+        if end > W: return {**out, 'st': 'expired'}
+        if (b['l'] <= sl0) if d == 1 else (b['h'] >= sl0): return {**out, 'st': 'sl_first'}
+        if (b['h'] >= tp0) if d == 1 else (b['l'] <= tp0): return {**out, 'st': 'tp_first'}
+        if (I['e9'][k] < I['e21'][k]) if d == 1 else (I['e9'][k] > I['e21'][k]): pulled = True
+        elif pulled:
+            e = b['c']; sl = ext - d * 0.3 * I['atr'][k]
+            if abs(e - sl) < 0.2 * r0: sl = e - d * 0.2 * r0
+            rk = abs(e - sl)
+            if (tp0 - e) * d <= 0.3 * rk: return {**out, 'st': 'no_room'}
+            res = {**out, 'st': 'open', 'te': end, 'e': round(e, 2), 'sl': round(sl, 2), 'tp': round(tp0, 2), 'risk': round(rk, 2)}
+            for q in B[k + 1:]:
+                qe = q['t'] + 900
+                if (q['l'] <= sl) if d == 1 else (q['h'] >= sl): return {**res, 'st': 'closed', 'why': 'SL', 'xt': qe, 'R': -1.0}
+                if (q['h'] >= tp0) if d == 1 else (q['l'] <= tp0): return {**res, 'st': 'closed', 'why': 'TP', 'xt': qe, 'R': round((tp0 - e) * d / rk, 2)}
+                if qe - end >= 7 * 86400: return {**res, 'st': 'closed', 'why': '7 ngày', 'xt': qe, 'R': round((q['c'] - e) * d / rk, 2)}
+            res['R_now'] = round((B[-1]['c'] - e) * d / rk, 2); return res
+        ext = min(ext, b['l']) if d == 1 else max(ext, b['h'])
+    return {**out, 'pulled': pulled, 'ext': round(ext, 2), 'left_h': round((W - now_t) / 3600, 1)}
+
+def m15_text(m):
+    if not m or m.get('st') in (None, 'nodata', 'error'): return None
+    dw = 'MUA' if m['d'] == 1 else 'BÁN'; head = f"Entry M15 (nâng cao) cho tín hiệu {dw} {fmt(m['sig_t'])}: "
+    st = m['st']
+    if st == 'waiting': return head + (f"EMA9 M15 đã hồi {'xuống dưới' if m['d'] == 1 else 'lên trên'} EMA21 ✅ → chờ EMA9 cắt {'LÊN' if m['d'] == 1 else 'XUỐNG'} lại EMA21 rồi vào ở giá đóng nến M15; SL {'dưới' if m['d'] == 1 else 'trên'} {f2(m['ext'])} − 0.3×ATR M15 (tối thiểu 0.2×ATR D1), TP {f2(m['tp0'])}." if m['pulled'] else f"chờ EMA9 M15 hồi {'xuống dưới' if m['d'] == 1 else 'lên trên'} EMA21 (còn {m['left_h']}h).") + ' Đặt cảnh báo "EMA9 cắt EMA21" khung M15 trên TradingView.'
+    if st == 'open': return head + f"ĐÃ KÍCH HOẠT lúc {fmt(m['te'])} · Entry {f2(m['e'])} · SL {f2(m['sl'])} ({m['risk']:.1f}$) · TP {f2(m['tp'])} · hiện {m['R_now']:+.2f}R."
+    if st == 'closed': return head + f"vào {fmt(m['te'])} ở {f2(m['e'])}, đã đóng {fmt(m['xt'])} ({m['why']}) = {m['R']:+.2f}R."
+    return head + {'expired': 'hết 24h không có điểm vào M15 → bỏ lệnh này.', 'sl_first': 'giá chạm SL gốc trước khi có điểm vào → bỏ.', 'tp_first': 'giá chạy tới TP gốc trước khi có điểm vào → bỏ.', 'no_room': 'điểm vào quá gần TP → bỏ.'}.get(st, st)
+
 # ---------------- ICT (giống ict.js) ----------------
 def swings(B, n):
     out = []
@@ -210,7 +251,7 @@ def news():
 
 # ---------------- viết nhận định ----------------
 def f2(x): return f'{x:,.2f}'
-def write_note(now_t, H, D, src, M, H4m, ict, lv, nw, prev_pos, prev_h4pos):
+def write_note(now_t, H, D, src, M, H4m, ict, lv, nw, prev_pos, prev_h4pos, m15=None):
     trades, pos, s = M; t4, pos4, s4 = H4m
     px = H[-1]['c']; p1 = H[-2]['c'] if len(H) > 1 else px; p24 = H[-25]['c'] if len(H) > 25 else px
     dw = lambda d: 'MUA' if d == 1 else 'BÁN'
@@ -248,6 +289,8 @@ def write_note(now_t, H, D, src, M, H4m, ict, lv, nw, prev_pos, prev_h4pos):
     lines.append(f"Giá {f2(px)} ({px - p1:+.1f}$ so với 1 giờ trước, {px - p24:+.1f}$ so với 24 giờ trước). RSI: D1 {ind(D[:-1])['rsi'][-1]:.0f} · H1 {s['rsi']:.0f}." if s else f"Giá {f2(px)}.")
     near = sorted(lv, key=lambda L: abs(L['p'] - px))[:3]
     if near: lines.append('Mức thanh khoản gần: ' + ' · '.join(f"{L['n']} {f2(L['p'])} ({L['p'] - px:+.1f}$)" for L in near) + '.')
+    t15 = m15_text(m15)
+    if t15: lines.insert(1, t15)
     if ict: lines.append(ict)
     if s4:
         if pos4: lines.append(f"Phương pháp dự phòng H4: đang có lệnh {dw(pos4['d'])} từ {fmt(pos4['t'])} ở {f2(pos4['e'])}, SL {f2(pos4['sl'])}, TP {f2(pos4['tp'])}.")
@@ -290,13 +333,15 @@ def run(prev_path, out_dir):
     M = main_method(H, D); M4 = h4_method(H, D)
     H4 = agg(H, 14400); lc4 = H[-1]['t'] + 3600 >= H4[-1]['t'] + 14400
     ictS, ictO = ict_text(H, H4, lc4); lv = levels(H); nw = news()
-    note = write_note(now_t, H, D, src, M, M4, ictS, lv, nw, prev.get('pos'), prev.get('pos4'))
+    last_sig = M[1] or (M[0][-1] if M[0] else None); m15 = None
+    if last_sig and now_t - last_sig['t'] <= 8 * 86400: m15 = m15_entry(last_sig, now_t)
+    note = write_note(now_t, H, D, src, M, M4, ictS, lv, nw, prev.get('pos'), prev.get('pos4'), m15)
     J = {str(x['t']): x for x in prev.get('journal', [])}; J.update({str(x['t']): x for x in M[0]})
     J4 = {str(x['t']): x for x in prev.get('journal4', [])}; J4.update({str(x['t']): x for x in M4[0]})
     notes = [x for x in prev.get('notes', []) if x.get('bar') != note['bar']] + [note]
     out = {'updated': now_t, 'src': src, 'px': round(H[-1]['c'], 2), 'bar': H[-1]['t'], 'note': note, 'notes': notes[-KEEP_NOTES:],
            'pos': M[1], 'state': M[2], 'pos4': M4[1], 'state4': M4[2], 'journal': sorted(J.values(), key=lambda x: x['t']), 'journal4': sorted(J4.values(), key=lambda x: x['t']),
-           'levels': lv, 'ind': table(H, D), 'ict': ictO, 'news': nw, 'from': H[0]['t']}
+           'levels': lv, 'ind': table(H, D), 'm15': m15, 'ict': ictO, 'news': nw, 'from': H[0]['t']}
     os.makedirs(out_dir, exist_ok=True)
     json.dump(out, open(os.path.join(out_dir, 'live.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     print(note['title']); [print(' -', l) for l in note['lines']]

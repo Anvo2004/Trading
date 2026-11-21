@@ -2,6 +2,34 @@
    Số liệu lấy từ data/opt.js (train swing H1) và data/mtf.js (so sánh khung) → tự cập nhật sau mỗi lần train lại. */
 'use strict';
 const Method = {
+  ltf() {
+    const R = window.REF; if (!R) return '';
+    const K = R.key, cls = v => v > 0.05 ? 'pos' : v < -0.05 ? 'neg' : '';
+    const row = (k, lab) => { const v = K[k]; if (!v) return ''; return `<tr><td>${lab}</td><td class="mono">${v.n}</td><td class="mono">${v.wr}%</td><td class="mono ${cls(v.exp)}"><b>${fR(v.exp)}</b></td><td class="mono ${cls(v.tot)}">${v.tot >= 0 ? '+' : ''}${v.tot}R</td><td class="mono">${v.totb >= 0 ? '+' : ''}${v.totb}</td><td class="mono">${Math.round(v.risk_ratio * 100)}%</td><td class="mono">${v.ms}</td><td class="mono">${v.dd}R</td></tr>`; };
+    const T15 = K.m15_tight, ys = Object.entries(T15.ys).map(([y, v]) => `<span class="pill ${v[1] > 0 ? 'up' : 'down'}">${y}: ${v[1] >= 0 ? '+' : ''}${v[1]}R</span>`).join(' ');
+    const slNow = 88.7 * T15.risk_ratio;
+    return `<h2>5. Vào lệnh bằng M5 / M15 — có "đẹp" hơn không?</h2>
+    <div class="card"><p style="margin:0 0 8px">Đã thử <b>${R.n_cfg} cách vào lệnh</b> ở M5/M15 sau tín hiệu H1 (limit chờ hồi, EMA9/21 cắt lại, RSI hồi rồi vượt 50, quét đáy + MSS kiểu ICT; SL gốc hoặc SL theo khung nhỏ; TP gốc/2R/3R; chờ 4/8/24 giờ) trên ${R.n_bases} biến thể của phương pháp, quản lý lệnh trên từng nến M5 thật của Exness. Kết quả (phương pháp đang dùng):</p>
+      <div class="tblwrap"><table class="tbl"><tr><th>Cách vào lệnh</th><th>Lệnh</th><th>Thắng</th><th>TB/lệnh</th><th>Tổng R</th><th>Lời nếu giữ nguyên lot*</th><th>SL so với gốc</th><th>Thua liên tiếp</th><th>Sụt giảm</th></tr>
+        ${row('base', 'Gốc: market khi nến H1 đóng')}${row('delay4', 'Chỉ chờ 4 giờ rồi vào market (đối chứng)')}${row('m15_orig', 'Tín hiệu M15 (quét + MSS), giữ SL gốc')}${row('limit', 'Limit chờ giá hồi, giữ SL gốc')}${row('m15_tight', '<b>Entry M15: EMA9/21 M15 cắt lại + SL hẹp, TP gốc</b>')}${row('sniper', 'Entry M5: EMA9/21 M5 cắt lại + SL hẹp, TP gốc')}</table></div>
+      <p class="muted" style="font-size:12px;margin:6px 0 10px">* Lời tính theo đơn vị "rủi ro gốc" (1×ATR D1) khi giữ nguyên số lot như cách gốc. "Tổng R" tính khi chỉnh lot theo rủi ro thật của từng lệnh (SL hẹp → lot lớn hơn để cùng % rủi ro). Bản gốc ở bảng này đóng lệnh sau đúng 7 ngày lịch nên thấp hơn số +0.46R ở trên.</p>
+      <div class="grid g2">
+        <div class="note" style="margin:0;font-size:13.5px"><b>Phát hiện 1 — giá vào không "đẹp" hơn.</b> Giá vào bằng M5/M15 trung bình gần như bằng giá đóng nến H1. Nếu <b>giữ SL gốc</b>, mọi kiểu tín hiệu M5/M15 cho kết quả <b>giống hệt việc chỉ chờ 4 giờ rồi vào</b> → tín hiệu khung nhỏ không thêm lợi thế. Cách đơn giản: không cần vội, vào trong 1–4 giờ sau tín hiệu.</div>
+        <div class="note ok" style="margin:0;font-size:13.5px"><b>Phát hiện 2 — SL hẹp mới tạo khác biệt.</b> Vào bằng M15 với SL sau nhịp hồi (≈ ${Math.round(T15.risk_ratio * 100)}% SL gốc) nhưng <b>vẫn giữ TP gốc</b>: thắng ít hơn (${T15.wr}%) nhưng mỗi lệnh thắng ≈ +5 đến +10R. Có lãi cả 6/6 năm (${ys}); tốt hơn cách gốc ở ${T15.better_in}/${R.n_bases} biến thể; walk-forward nhóm SL hẹp ${fR(R.wf_tight.oos_R / Math.max(1, R.wf_tight.oos_n))}/lệnh so với gốc ${fR(R.wf_tight.base_oos_R / Math.max(1, R.wf_tight.base_oos_n))}.</div>
+      </div></div>
+    <div class="card" style="margin-top:14px;border-color:rgba(232,184,74,.55)"><h4>🎯 Luật Entry M15 (nâng cao, tùy chọn)</h4><ol style="margin:0;padding-left:20px;line-height:1.8">
+      <li>Chỉ dùng khi phương pháp chính vừa có <b>tín hiệu H1</b> (①②③ đủ). Ghi lại <b>giá tín hiệu P0</b> và <b>ATR D1</b>. TP gốc = P0 ± 2×ATR D1, SL gốc = P0 ∓ 1×ATR D1.</li>
+      <li>Mở <b>M15</b>, thêm EMA 9, EMA 21, ATR 14. Trong <b>24 giờ</b> sau tín hiệu: chờ EMA9 M15 hồi <b>xuống dưới</b> EMA21 (MUA) / <b>lên trên</b> EMA21 (BÁN) — giá đang điều chỉnh.</li>
+      <li>Khi EMA9 M15 <b>cắt lại</b> theo hướng tín hiệu → vào lệnh market ở giá đóng nến M15 đó.</li>
+      <li><b>SL</b> = đáy thấp nhất của nhịp hồi (MUA; BÁN thì đỉnh cao nhất) − 0.3×ATR M15. Nếu SL này cách giá vào <b>ít hơn 0.2×ATR D1</b> thì nới ra đúng 0.2×ATR D1.</li>
+      <li><b>TP = TP gốc</b> của tín hiệu H1 — không chốt sớm ở 2R/3R (phần lớn lợi thế nằm ở các lệnh chạy hết tới TP gốc). Tối đa 7 ngày.</li>
+      <li>Bỏ lệnh nếu: quá 24h không có điểm vào, hoặc giá chạm SL gốc / TP gốc trước khi có điểm vào.</li></ol>
+      <div class="grid g2" style="margin-top:10px">
+        <div class="note warn" style="margin:0;font-size:13px"><b>Cái giá phải trả:</b> chỉ thắng ~1/3 số lệnh, từng <b>thua liền ${T15.ms} lệnh</b>, sụt giảm tối đa ${T15.dd}R (rủi ro 1%/lệnh → −${T15.dd}% tài khoản). Phải canh M15 trong 24h sau tín hiệu (đặt cảnh báo "EMA9 crossing EMA21" khung M15 trên TradingView). Không chịu được chuỗi thua dài → dùng cách gốc.</div>
+        <div class="note ok" style="margin:0;font-size:13px"><b>Lợi ích cho vốn nhỏ:</b> SL hiện ≈ ${slNow.toFixed(0)}$ thay vì ≈ 89$ → tài khoản Cent 57$: 0.01 lot chỉ rủi ro ≈ ${(slNow * 0.01).toFixed(2)}$ (${(slNow * 0.01 / 57 * 100).toFixed(1)}%), có thể dùng 0.02 lot (≈ ${(slNow * 0.02 / 57 * 100).toFixed(1)}%). Bot theo giờ tự theo dõi Entry M15 và báo khi đã kích hoạt.</div>
+      </div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Bản M5 (cùng luật trên M5, chờ 8h) có tổng R tương tự nhưng thua liền tới ${K.sniper.ms} lệnh và sụt giảm ${K.sniper.dd}R — M15 dễ theo và ổn định hơn. Kết quả trên ~100 lệnh, chọn ra từ ${R.n_cfg} cách → kỳ vọng thật sẽ thấp hơn. Nên demo 20 lệnh trước.</p></div>`;
+  },
   render() {
     const el = $('#mtOut'); if (!el) return;
     const O = window.OPT, X = window.MTF, P = O && O.pick, cls = v => v > 0.05 ? 'pos' : v < -0.05 ? 'neg' : '';
@@ -71,10 +99,13 @@ const Method = {
       <li><b>SL</b> = giá vào ± 1 × ATR → BÁN: 4079.21 + 77.15 = <b>4156.36</b> (MUA thì trừ).</li>
       <li><b>TP</b> = giá vào ∓ 2 × ATR → BÁN: 4079.21 − 154.30 = <b>3924.91</b> (MUA thì cộng).</li>
       <li><b>Lot:</b> Cent 0.01 lot → chạm SL mất ≈ ATR × 0.01 = 0.77$; Standard 0.01 lot → mất ≈ 77$. Chọn lot sao cho mất ≤ 1–2% vốn (ô tính lot có sẵn ở trang <a href="#plan">📅 Plan</a>).</li>
-      <li>Kết quả lệnh ví dụ (10/11/2026): giá chạm TP ngày 12/11 → <b>+2R</b> (sau phí +1.98R).</li></ol>
+      <li>Kết quả lệnh ví dụ (10/11/2026): giá chạm TP ngày 12/11 → <b>+2R</b> (sau phí +1.98R).</li>
+      <li>Không cần vội: vào trễ 1–4 giờ sau tín hiệu (giữ nguyên SL/TP) cho kết quả bằng hoặc tốt hơn — xem mục 5 và 6.</li></ol>
       <p class="muted" style="font-size:12.5px;margin:8px 0 0">Giá trên web là PAXG (≈ XAUUSD, lệch vài $). Khi vào lệnh, dùng <b>khoảng cách</b> SL/TP (bằng $) cộng/trừ vào giá khớp thật trên MT5 của bạn.</p></div>
 
-    <h2>5. Quản lý lệnh</h2>
+    ${this.ltf()}
+
+    <h2>5b. Quản lý lệnh</h2>
     <div class="grid g2">
       <div class="card"><h4>✅ Làm</h4><ul style="margin:0;padding-left:18px;line-height:1.7">
         <li>Đặt SL/TP ngay khi vào, rồi để thị trường làm việc.</li>

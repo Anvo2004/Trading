@@ -28,7 +28,12 @@ def export_mtf():
     out['updated'] = time.strftime('%Y-%m-%d %H:%M')
     open(os.path.join(SITE, 'data', 'mtf.js'), 'w', encoding='utf-8').write('window.MTF = ' + json.dumps(out, ensure_ascii=False) + ';\n')
     log('Đã xuất data/mtf.js:', ', '.join(f"{k} WF {v['wf']['oos_exp']:+.3f}R" for k, v in out.items() if k != 'updated'))
-if '--export-only' in sys.argv: export_mtf(); raise SystemExit
+def export_ref():
+    r = json.load(open(os.path.join(DATA, 'refine.json'), encoding='utf-8'))
+    r2 = {k: r[k] for k in ('n_cfg', 'n_bases', 'wf', 'wf_orig', 'wf_tight', 'wf_delay', 'family', 'base', 'key', 'sniper_trades', 'all', 'secs') if k in r}
+    open(os.path.join(SITE, 'data', 'refine.js'), 'w', encoding='utf-8').write('window.REF = ' + json.dumps(r2, ensure_ascii=False) + ';\n')
+    log('Đã xuất data/refine.js')
+if '--export-only' in sys.argv: export_mtf(); export_ref(); raise SystemExit
 
 T0 = time.time()
 # 1) tải lại tháng gần nhất (file tháng hiện tại trong kho Exness được bổ sung mỗi ngày) + các tháng mới
@@ -60,11 +65,12 @@ if '--no-mtf' not in sys.argv:
     for tf in ('H4', 'H1', 'M15', 'M5'):
         log('Train đa khung', tf, '…'); out = run([PY, 'mtf.py', CSV, tf, os.path.join(DATA, f'mtf_{tf}.json')]); log(out.strip().splitlines()[-1][:300])
     export_mtf()
+    log('Tinh chỉnh entry M5/M15 …'); run([PY, 'refine.py', CSV, os.path.join(DATA, 'refine.json')]); export_ref()
 
 # 4) đẩy lên GitHub để web cập nhật
 if '--push' in sys.argv:
     g = lambda *a: subprocess.run(['git', *a], cwd=SITE, capture_output=True, text=True, encoding='utf-8')
-    g('add', 'data/opt.js', 'data/mtf.js')
+    g('add', 'data/opt.js', 'data/mtf.js', 'data/refine.js')
     if g('diff', '--cached', '--quiet').returncode:
         msg = f"Tự động train lại trên dữ liệu Exness tới {time.strftime('%d/%m/%Y')}"
         c = g('commit', '-m', msg); p = g('push')

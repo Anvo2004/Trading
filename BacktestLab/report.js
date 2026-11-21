@@ -51,8 +51,20 @@ const Report = {
       <p class="muted" style="font-size:12.5px">Đọc bảng: cột <b>walk-forward</b> là quan trọng nhất — máy chọn tham số chỉ bằng các năm trước rồi trade năm sau. "% tổ hợp có lãi" thấp nghĩa là khung đó gần như ngẫu nhiên sau phí; khi đó cấu hình "tốt nhất" nhiều khả năng chỉ ăn may. Hàng H1 ở đây dùng lưới nhỏ hơn (SL theo ATR H4); phương pháp H1 chính ở phía trên dùng SL theo ATR D1 và cho walk-forward tốt hơn (+0.57R).</p>${det}`;
     TFS.forEach(k => { const r = X[k]; if (r.pick_trades && $('#mtfEq' + k)) { let s = 0; UI.eq($('#mtfEq' + k), r.pick_trades.map(x => s += x[3])); } });
   },
+  renderRef() {
+    const R = window.REF, el = $('#rpRef'); if (!el || !R) return;
+    const cls = v => v > 0.05 ? 'pos' : v < -0.05 ? 'neg' : '';
+    const FN = { delay: 'Chỉ chờ rồi vào market (đối chứng)', limit: 'Limit chờ giá hồi', ema_M15_orig: 'EMA9/21 M15 · SL gốc', ema_M15_ltf: 'EMA9/21 M15 · SL hẹp', rsi_M15_orig: 'RSI M15 · SL gốc', rsi_M15_ltf: 'RSI M15 · SL hẹp', mss_M15_orig: 'Quét + MSS M15 · SL gốc', mss_M15_ltf: 'Quét + MSS M15 · SL hẹp', ema_M5_orig: 'EMA9/21 M5 · SL gốc', ema_M5_ltf: 'EMA9/21 M5 · SL hẹp', rsi_M5_orig: 'RSI M5 · SL gốc', rsi_M5_ltf: 'RSI M5 · SL hẹp', mss_M5_orig: 'Quét + MSS M5 · SL gốc', mss_M5_ltf: 'Quét + MSS M5 · SL hẹp' };
+    const fam = Object.entries(R.family).filter(([k]) => k !== 'market').map(([k, v]) => `<tr><td>${FN[k] || k}</td><td class="mono">${v.n_cfg}</td><td class="mono ${cls(v.avg_gain)}">${v.avg_gain >= 0 ? '+' : ''}${v.avg_gain}R</td><td class="mono">${v.pct_better}%</td></tr>`).join('');
+    const wf = (W, lab) => `<tr><td>${lab}</td><td class="mono">${W.oos_n} lệnh · ${W.oos_R >= 0 ? '+' : ''}${W.oos_R}R</td><td class="mono">${W.base_oos_n} lệnh · ${W.base_oos_R >= 0 ? '+' : ''}${W.base_oos_R}R</td></tr>`;
+    el.innerHTML = `<h2>Tinh chỉnh điểm vào bằng M5 / M15</h2>
+      <p class="muted" style="margin:-4px 0 10px">${R.n_cfg} cách vào lệnh × ${R.n_bases} biến thể phương pháp, quản lý trên từng nến M5 Exness (spread thật). Gốc: ${R.base.n} lệnh, ${fR(R.base.exp)}/lệnh, tổng ${R.base.tot}R. Luật đầy đủ và khuyến nghị ở trang <a href="#method">📘 Phương pháp</a> mục 5.</p>
+      <div class="grid g2"><div class="card"><h4>Theo nhóm (so với vào market của chính phương pháp)</h4><table class="tbl"><tr><th>Nhóm</th><th>Số cách</th><th>Tổng R thêm (TB)</th><th>% cách tốt hơn gốc</th></tr>${fam}</table></div>
+      <div class="card"><h4>Walk-forward (chọn cách vào lệnh chỉ bằng các năm trước)</h4><table class="tbl"><tr><th>Được chọn trong</th><th>Năm chưa thấy</th><th>Gốc cùng năm</th></tr>${wf(R.wf, 'Tất cả các cách')}${wf(R.wf_orig, 'Chỉ cách giữ SL gốc')}${wf(R.wf_delay, 'Chỉ chờ rồi vào (đối chứng)')}${wf(R.wf_tight, 'Chỉ cách SL hẹp')}</table>
+        <p class="muted" style="font-size:12.5px;margin:8px 0 0">Giữ SL gốc thì tín hiệu M5/M15 ≈ chỉ chờ vài giờ. Khác biệt thật đến từ SL hẹp + giữ TP gốc (tỷ lệ thắng thấp, mỗi lệnh thắng R lớn).</p></div></div>`;
+  },
   render() {
-    this.renderOpt(); this.renderMTF();
+    this.renderOpt(); this.renderMTF(); this.renderRef();
     const B = window.BT, el = $('#rpOut'); if (!el) return;
     if (!B) { el.innerHTML = '<div class="note bad">Chưa có dữ liệu báo cáo.</div>'; return; }
     const R = B.rows.filter(r => this.grp === 'all' || r.group === this.grp).slice().sort((a, b) => (b[this.sort] ?? -9) - (a[this.sort] ?? -9));

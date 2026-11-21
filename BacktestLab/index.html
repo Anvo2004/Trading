@@ -273,6 +273,7 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
   <p class="lead">Kiểm tra tự động 5 nhóm chiến lược scalp (ICT, EMA9/21 của video, pullback RSI, MACD, phá range phiên Á) và nhóm swing (xu hướng D1 → hồi RSI H4 → kích hoạt H1). Không nhìn trước tương lai: khung lớn chỉ dùng nến đã đóng; SL và TP cùng chạm trong 1 nến thì tính SL; mỗi chiến lược tối đa 1 lệnh cùng lúc.</p>
   <div id="rpOpt"></div>
   <div id="rpMtf"></div>
+  <div id="rpRef"></div>
   <h2>Lượt kiểm tra trước (PAXG, phí cố định 0.4$)</h2>
   <div id="rpOut"></div>
   <div class="card" style="margin-top:14px"><h4>Cách tự chạy lại</h4><p class="muted" style="font-size:13px;margin:0">Mã nguồn ở thư mục <code>BacktestLab/backtest/</code> (Python + pandas): <code>exness_ticks.py</code> tải dữ liệu tick Exness → <code>opt.py</code> train swing H1 → <code>mtf.py &lt;csv&gt; H4|H1|M15|M5 &lt;json&gt;</code> train đa khung → <code>update.py --push</code> làm tất cả và đẩy lên web (chạy tự động mỗi Chủ nhật). Lượt cũ: <code>python run.py &lt;thư mục&gt; &lt;file.csv&gt; 2021-01-01</code>. File CSV: <code>time,open,high,low,close,volume</code> — có thể dùng file xuất từ TradingView (Export chart data) hoặc MT5.</p></div>
@@ -475,6 +476,7 @@ TRƯỚC KHI BẤM LỆNH
 <script src="data/bt.js"></script>
 <script src="data/opt.js"></script>
 <script src="data/mtf.js"></script>
+<script src="data/refine.js"></script>
 <script src="report.js"></script>
 <script src="method.js"></script>
 <script src="live.js"></script>

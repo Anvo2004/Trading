@@ -80,24 +80,25 @@ def agg(B, tf):
     return out
 
 # ---------------- mô phỏng lệnh ----------------
-def exit_check(pos, b, t_end, trades):
+def exit_check(pos, b, t_end, trades, gen=False):
     d = pos['d']; px = why = None
     if (b['l'] <= pos['sl']) if d == 1 else (b['h'] >= pos['sl']): px, why = pos['sl'], 'SL'
     elif (b['h'] >= pos['tp']) if d == 1 else (b['l'] <= pos['tp']): px, why = pos['tp'], 'TP'
     elif t_end - pos['t'] >= 7 * 86400: px, why = b['c'], '7 ngày'
     if px is None: return False
-    nights = (t_end - pos['t']) // 86400; cost = 0.35 + 0.5 * nights
+    nights = (t_end - pos['t']) // 86400
+    cost = (0.004 + 0.008 * nights) * pos['r'] if gen else 0.35 + 0.5 * nights   # gen: thị trường khác, phí theo % ATR D1
     trades.append({**pos, 'xt': t_end, 'xp': round(px, 2), 'why': why, 'R': round(((px - pos['e']) * d - cost) / pos['r'], 2)}); return True
 
-def main_method(Hall, D):
+def main_method(Hall, D, gen=False):
     """① D1 giá vs EMA50 + EMA50 so với 5 ngày trước ② RSI H4 <40 / >60 trong 24 nến H4 ③ RSI H1 cắt 50 + nến H4 gần nhất cùng phía EMA21 H4. SL 1×ATR D1, TP 2R, tối đa 7 ngày."""
     H = Hall[:-1]; n = len(H); I = ind(H); Di = ind(D); H4 = agg(H, 14400); I4 = ind(H4)
     trades = []; pos = None; qd = q4 = -1; st = None
     for j in range(1, n):
         te = H[j]['t'] + 3600
-        while qd + 1 < len(D) and D[qd + 1]['t'] + 86400 <= te: qd += 1
+        while qd + 1 < len(D) and D[qd + 1].get('close_t', D[qd + 1]['t'] + 86400) <= te: qd += 1
         while q4 + 1 < len(H4) and H4[q4 + 1]['t'] + 14400 <= te: q4 += 1
-        if pos and exit_check(pos, H[j], te, trades): pos = None
+        if pos and exit_check(pos, H[j], te, trades, gen): pos = None
         if qd < 60 or q4 < 24: continue
         c, e50, e50p = Di['c'][qd], Di['e50'][qd], Di['e50'][qd - 5]
         trD = 1 if c > e50 and e50 > e50p else -1 if c < e50 and e50 < e50p else 0
@@ -106,10 +107,11 @@ def main_method(Hall, D):
         if j == n - 1: st = {'trD': trD, 'rmin': rmin, 'rmax': rmax, 'side': side, 'pulled': pulled, 'rsi': I['rsi'][j], 'rsi_prev': I['rsi'][j - 1], 'datr': Di['atr'][qd], 'dc': c, 'e50': e50, 'e50p': e50p, 'h4e21': I4['e21'][q4], 'h4c': H4[q4]['c']}
         if pos or not trD or not pulled or side != trD: continue
         if (I['rsi'][j] > 50 and I['rsi'][j - 1] <= 50) if trD == 1 else (I['rsi'][j] < 50 and I['rsi'][j - 1] >= 50):
-            e = H[j]['c']; r = Di['atr'][qd]; pos = {'d': trD, 't': te, 'e': round(e, 2), 'sl': round(e - trD * r, 2), 'tp': round(e + 2 * trD * r, 2), 'r': round(r, 2)}
+            e = H[j]['c']; r = Di['atr'][qd]; nd = 2 if e > 50 else 5
+            pos = {'d': trD, 't': te, 'e': round(e, nd), 'sl': round(e - trD * r, nd), 'tp': round(e + 2 * trD * r, nd), 'r': round(r, nd)}
     if pos:
         b = Hall[-1]
-        if exit_check(pos, b, b['t'] + 3600, trades): pos = None
+        if exit_check(pos, b, b['t'] + 3600, trades, gen): pos = None
     return trades, pos, st
 
 def h4_method(Hall, D):
@@ -336,12 +338,20 @@ def run(prev_path, out_dir):
     last_sig = M[1] or (M[0][-1] if M[0] else None); m15 = None
     if last_sig and now_t - last_sig['t'] <= 8 * 86400: m15 = m15_entry(last_sig, now_t)
     note = write_note(now_t, H, D, src, M, M4, ictS, lv, nw, prev.get('pos'), prev.get('pos4'), m15)
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import multi
+        ms = multi.scan(prev.get('markets', {})); sl = multi.summary_line(ms)
+        if sl: note['lines'].insert(1, sl)
+        if any(m['act'] == 'SIGNAL' for m in ms.values()) and note['act'] not in ('SIGNAL',): note['act2'] = 'SIGNAL'
+    except Exception as e:
+        print('Quét đa thị trường lỗi:', e); ms = prev.get('markets', {})
     J = {str(x['t']): x for x in prev.get('journal', [])}; J.update({str(x['t']): x for x in M[0]})
     J4 = {str(x['t']): x for x in prev.get('journal4', [])}; J4.update({str(x['t']): x for x in M4[0]})
     notes = [x for x in prev.get('notes', []) if x.get('bar') != note['bar']] + [note]
     out = {'updated': now_t, 'src': src, 'px': round(H[-1]['c'], 2), 'bar': H[-1]['t'], 'note': note, 'notes': notes[-KEEP_NOTES:],
            'pos': M[1], 'state': M[2], 'pos4': M4[1], 'state4': M4[2], 'journal': sorted(J.values(), key=lambda x: x['t']), 'journal4': sorted(J4.values(), key=lambda x: x['t']),
-           'levels': lv, 'ind': table(H, D), 'm15': m15, 'ict': ictO, 'news': nw, 'from': H[0]['t']}
+           'levels': lv, 'ind': table(H, D), 'm15': m15, 'markets': ms, 'ict': ictO, 'news': nw, 'from': H[0]['t']}
     os.makedirs(out_dir, exist_ok=True)
     json.dump(out, open(os.path.join(out_dir, 'live.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     print(note['title']); [print(' -', l) for l in note['lines']]

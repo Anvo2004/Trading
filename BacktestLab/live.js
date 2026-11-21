@@ -13,6 +13,9 @@ const Live = {
     if (Router.cur === 'live') this.render(); this.mini();
   },
   alert() {
+    const seen = Store.get('mkSeen', {}); let ch = false;
+    Object.entries(this.d.markets || {}).forEach(([k, m]) => { if (m.act === 'SIGNAL' && m.pos && m.pos.t > (seen[k] || 0)) { seen[k] = m.pos.t; ch = true; Plan.notify(`Tín hiệu ${m.pos.d === 1 ? 'MUA' : 'BÁN'} ${m.name}`, `Entry ${m.pos.e} · SL ${m.pos.sl} · TP ${m.pos.tp}`); } });
+    if (ch) Store.set('mkSeen', seen);
     const n = this.d.note; if (!n || (n.act !== 'SIGNAL' && n.act !== 'CLOSED')) return;
     if (n.t <= Store.get('liveSeen', 0)) return; Store.set('liveSeen', n.t);
     Plan.notify(n.title.replace(/^\S+\s/, ''), (n.lines[0] || '').slice(0, 140));
@@ -22,6 +25,25 @@ const Live = {
     if (!this.d) { el.innerHTML = ''; return; }
     const n = this.d.note, a = this.ACT[n.act] || ['', '', ''];
     el.innerHTML = `<a href="#live" style="text-decoration:none;color:inherit"><div class="note ${a[1]}" style="font-size:13.5px;margin:0 0 14px"><b>🕐 Nhận định ${T.fmt(n.t, false)}:</b> ${esc(n.title)} <span class="muted">— bấm để xem chi tiết</span></div></a>`;
+  },
+  ORDER: { SIGNAL: 0, HOLD: 1, READY: 2, CLOSED: 3, WAIT: 4, NOTRADE: 5, ERROR: 6 },
+  LAB: { SIGNAL: '🔔 TÍN HIỆU', HOLD: '🟢 Đang giữ', READY: '🟠 Sẵn sàng', CLOSED: '🏁 Vừa đóng', WAIT: '🟡 Chờ hồi', NOTRADE: '⚪ Đứng ngoài', ERROR: '— lỗi dữ liệu' },
+  setups() {
+    const D = this.d, dw = d => d === 1 ? 'MUA' : 'BÁN', nd = x => Math.abs(x) >= 50 ? 2 : 5, F = x => x == null ? '—' : (+x).toFixed(nd(x));
+    const gold = { name: 'Vàng XAUUSD', act: D.note.act === 'SIGNAL' ? 'SIGNAL' : D.pos ? 'HOLD' : D.note.act, pos: D.pos, state: D.state, px: D.px, bt: { n: 82, exp: 0.46, pos_years: 6, n_years: 6 } };
+    const all = [['XAUUSDm', gold], ...Object.entries(D.markets || {})].sort((a, b) => (this.ORDER[a[1].act] ?? 9) - (this.ORDER[b[1].act] ?? 9));
+    const rows = all.map(([k, m]) => {
+      const s = m.state || {}, P = m.pos, a = m.act;
+      const step = !s.trD ? 'D1 không rõ xu hướng' : a === 'READY' ? `chờ RSI H1 cắt ${s.trD === 1 ? 'LÊN' : 'XUỐNG'} 50 (đang ${(+s.rsi).toFixed(1)})`
+        : !s.pulled ? `chờ RSI H4 ${s.trD === 1 ? '< 40 (thấp nhất ' + (+s.rmin).toFixed(0) + ')' : '> 60 (cao nhất ' + (+s.rmax).toFixed(0) + ')'}` : s.side !== s.trD ? 'chờ nến H4 đóng lại đúng phía EMA21' : '';
+      const order = P ? `<b>${dw(P.d)}</b> ${F(P.e)} · SL ${F(P.sl)} · TP ${F(P.tp)}<br><span class="muted">từ ${T.fmt(P.t).slice(3)} · SL cách ${F(P.r)}</span>` : a === 'CLOSED' && m.closed ? `Đóng ${m.closed.why} = <b class="${m.closed.R > 0 ? 'pos' : 'neg'}">${m.closed.R > 0 ? '+' : ''}${m.closed.R}R</b>` : a === 'ERROR' ? `<span class="muted">${esc(m.err || '')}</span>` : esc(step);
+      const bt = m.bt ? `${m.bt.n} lệnh · ${fR(m.bt.exp)} · lãi ${m.bt.pos_years}/${m.bt.n_years} năm` : '';
+      return `<tr><td><b>${esc(m.name)}</b>${s.trD ? ` <span class="pill ${s.trD === 1 ? 'up' : 'down'}">chỉ ${dw(s.trD)}</span>` : ''}</td><td>${this.LAB[a] || a}</td><td style="font-size:12.5px">${order}</td><td class="mono">${s.datr ? F(s.datr) : '—'}</td><td class="mono muted" style="font-size:12px">${bt}</td></tr>`;
+    }).join('');
+    const nReady = all.filter(([, m]) => ['SIGNAL', 'HOLD', 'READY'].includes(m.act)).length;
+    return `<div class="card" style="margin-top:14px;border-color:rgba(76,141,255,.5)"><h4>📋 Setup hôm nay — ${all.length} thị trường đạt chuẩn (${nReady} đang có lệnh hoặc sẵn sàng)</h4>
+      <div class="tblwrap"><table class="tbl"><tr><th>Thị trường</th><th>Trạng thái</th><th>Lệnh / việc cần chờ</th><th>SL = 1×ATR D1</th><th>Kết quả kiểm tra 2021–2026</th></tr>${rows}</table></div>
+      <p class="muted" style="font-size:12px;margin:6px 0 0">Cùng một luật cho mọi thị trường (xem <a href="#method">📘 Phương pháp</a>). Giá từ Binance/Yahoo, lệch CFD Exness một chút → trên MT5 dùng <b>khoảng cách</b> SL/TP cộng/trừ vào giá khớp thật. Tối đa 3 lệnh mở cùng lúc, không mở 2 lệnh cùng hướng trên các cặp cùng đồng tiền (VD EURUSD + GBPUSD cùng MUA).</p></div>`;
   },
   stat(arr) { const n = arr.length, w = arr.filter(x => x.R > 0).length, R = arr.reduce((q, x) => q + x.R, 0); return n ? `${n} lệnh · thắng ${Math.round(w / n * 100)}% · tổng <b class="${R >= 0 ? 'pos' : 'neg'}">${R >= 0 ? '+' : ''}${R.toFixed(2)}R</b>` : 'chưa có lệnh'; },
   render() {
@@ -51,8 +73,9 @@ const Live = {
       <div class="row muted" style="gap:12px;font-size:12.5px;margin-bottom:8px"><span>Bot cập nhật lúc <b style="color:var(--text)">${T.fmt(D.updated)}</b> (${age} phút trước) · tự chạy mỗi giờ, 24/7</span><span>Nguồn: ${esc(D.src)}</span><button class="btn sm" onclick="Live.load()">↻ Tải lại</button><button class="btn sm" onclick="Plan.askNotify()">🔔 Bật thông báo</button></div>
       ${age > 150 ? '<div class="note warn" style="font-size:12.5px">Nhận định đã cũ hơn 2 giờ — có thể thị trường đang đóng cửa (cuối tuần) hoặc GitHub đang chậm.</div>' : ''}
       <div class="card" style="border-color:rgba(232,184,74,.5)"><div class="muted" style="font-size:12.5px;margin-bottom:6px">Nhận định mới nhất · dữ liệu tới ${T.fmt(n.t)} · giá ${f2(n.px)} (PAXG ≈ XAUUSD, lệch vài $)</div>${note(n, true)}</div>
+      ${this.setups()}
       <div class="grid g2" style="margin-top:14px">
-        <div class="card"><h4>🎯 Phương pháp chính — đang ở bước nào?</h4>${pos}${chk}
+        <div class="card"><h4>🎯 Vàng — đang ở bước nào?</h4>${pos}${chk}
           <p class="muted" style="font-size:12px;margin:8px 0 0">Đủ cả 4 ô → vào lệnh. SL = 1×ATR D1 (hiện ${s ? s.datr.toFixed(1) : '—'}$), TP = 2×SL. Luật đầy đủ: <a href="#method">📘 Phương pháp giao dịch</a>.</p></div>
         <div class="card"><h4>📰 Tin đỏ USD sắp tới (giờ VN)</h4>${nw}<h4 style="margin-top:12px">Mức thanh khoản</h4><table class="tbl">${lv}</table></div>
       </div>

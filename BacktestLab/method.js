@@ -30,6 +30,20 @@ const Method = {
       </div>
       <p class="muted" style="font-size:12px;margin:8px 0 0">Bản M5 (cùng luật trên M5, chờ 8h) có tổng R tương tự nhưng thua liền tới ${K.sniper.ms} lệnh và sụt giảm ${K.sniper.dd}R — M15 dễ theo và ổn định hơn. Kết quả trên ~100 lệnh, chọn ra từ ${R.n_cfg} cách → kỳ vọng thật sẽ thấp hơn. Nên demo 20 lệnh trước.</p></div>`;
   },
+  mk() {
+    const X = window.MK; if (!X) return '';
+    const M = Object.values(X.markets), ok = d => d.n >= 30 && d.exp >= 0.10 && d.pf >= 1.2 && d.pos_years >= 4, cls = v => v > 0.05 ? 'pos' : v < -0.05 ? 'neg' : '';
+    const NM = { XAUUSDm: 'Vàng', XAGUSDm: 'Bạc', EURUSDm: 'EURUSD', GBPUSDm: 'GBPUSD', USDJPYm: 'USDJPY', AUDUSDm: 'AUDUSD', USDCADm: 'USDCAD', EURJPYm: 'EURJPY', GBPJPYm: 'GBPJPY', BTCUSDm: 'Bitcoin', ETHUSDm: 'Ethereum', USTECm: 'Nasdaq 100', US30m: 'Dow Jones', US500m: 'S&P 500', USOILm: 'Dầu WTI', UKOILm: 'Dầu Brent', DE30m: 'DAX', JP225m: 'Nikkei' };
+    M.sort((a, b) => (ok(b) - ok(a)) || b.exp - a.exp);
+    const good = M.filter(ok), perYear = good.reduce((s, d) => s + d.n, 0) / 6, totR = good.reduce((s, d) => s + d.tot, 0);
+    const rows = M.map(d => `<tr><td><b>${NM[d.sym] || d.sym}</b> <span class="muted mono" style="font-size:11px">${d.sym}</span></td><td class="mono">${d.n}</td><td class="mono">${d.wr}%</td><td class="mono ${cls(d.exp)}"><b>${fR(d.exp)}</b></td><td class="mono">${d.pf}</td><td class="mono">${d.pos_years}/${d.n_years}</td><td class="mono">${d.dd}R</td><td>${ok(d) ? '<span class="pill up">ĐẠT — bot quét</span>' : '<span class="pill down">Không dùng</span>'}</td></tr>`).join('');
+    return `<h2>7. Nhiều setup hơn: cùng phương pháp trên nhiều thị trường</h2>
+    <div class="card"><p style="margin:0 0 8px">Một thị trường chỉ có ~14 tín hiệu/năm. Muốn nhiều setup hơn mà <b>không đổi sang scalp</b> (đã chứng minh thua sau phí), cách an toàn là áp <b>đúng luật gốc của vàng, không chỉnh tham số</b> lên thị trường khác. Đã kiểm tra ${M.length} thị trường trên dữ liệu tick Exness 2021–2026 (spread thật, trượt giá, swap ước tính):</p>
+      <div class="tblwrap"><table class="tbl"><tr><th>Thị trường</th><th>Lệnh</th><th>Thắng</th><th>TB/lệnh</th><th>PF</th><th>Năm có lãi</th><th>Sụt giảm</th><th>Kết luận</th></tr>${rows}</table></div>
+      ${good.length <= 1 ? `<div class="note bad" style="font-size:13.5px;margin-top:10px"><b>Kết luận: phương pháp CHỈ có lợi thế trên vàng.</b> Áp nguyên luật lên ${M.length - 1} thị trường khác: ${M.filter(d => d.sym !== 'XAUUSDm').reduce((s, d) => s + d.n, 0).toLocaleString()} lệnh, trung bình ${fR(M.filter(d => d.sym !== 'XAUUSDm').reduce((s, d) => s + d.tot, 0) / Math.max(1, M.filter(d => d.sym !== 'XAUUSDm').reduce((s, d) => s + d.n, 0)))}/lệnh — không thị trường nào đạt chuẩn. Vì vậy <b>không thể tăng số lệnh một cách an toàn bằng cách trade thêm thị trường</b>. Điều này cũng nhắc rằng lợi thế trên vàng gắn với giai đoạn vàng có xu hướng mạnh 2021–2026 → luôn rủi ro nhỏ và theo dõi lệnh thật. Bot vẫn kiểm tra lại mỗi Chủ nhật; thị trường nào đạt chuẩn sẽ tự được thêm vào danh sách quét.</div>` : ''}
+      <div class="note ok" style="font-size:13.5px;margin-top:10px"><b>${good.length} thị trường đạt chuẩn</b> (≥ 30 lệnh, ≥ +0.10R/lệnh, PF ≥ 1.2, có lãi ≥ 4/6 năm) → khoảng <b>${Math.round(perYear)} lệnh/năm</b> (≈ ${(perYear / 52).toFixed(1)} lệnh/tuần), tổng ${totR >= 0 ? '+' : ''}${totR.toFixed(0)}R trong 6 năm nếu trade tất cả. Mỗi ngày thường có vài thị trường ở trạng thái "sẵn sàng". Bot theo giờ tự quét tất cả và cập nhật danh sách mỗi tuần.</div>
+      <div class="note warn" style="font-size:13px"><b>Quản lý rủi ro khi trade nhiều thị trường:</b> rủi ro 0.5–1%/lệnh · tối đa <b>3 lệnh mở cùng lúc</b> · không mở 2 lệnh cùng hướng trên các cặp chung đồng tiền (EURUSD + GBPUSD cùng MUA = gấp đôi rủi ro USD) · lot mỗi thị trường khác nhau → dùng máy tính lot của Exness (nhập khoảng cách SL) · bắt đầu bằng demo. Kiểm tra ${M.length} thị trường thì vài cái "đạt" có thể do may mắn → theo dõi lệnh thật của bot trước khi tin.</div></div>`;
+  },
   render() {
     const el = $('#mtOut'); if (!el) return;
     const O = window.OPT, X = window.MTF, P = O && O.pick, cls = v => v > 0.05 ? 'pos' : v < -0.05 ? 'neg' : '';
@@ -133,7 +147,9 @@ const Method = {
       <div class="note warn" style="font-size:13.5px"><b>Tin đỏ USD</b> (CPI, Non-Farm, FOMC… thường 19:30/20:30 hoặc 1:00–2:00 sáng giờ VN): nếu tín hiệu rơi vào 30 phút trước/sau tin, <b>đợi nến H1 chứa tin đóng xong rồi mới vào</b> — vào trễ không làm hại kết quả, còn tránh được trượt giá lớn. Trang nhận định theo giờ tự liệt kê tin đỏ sắp tới. Cuối tuần thị trường đóng cửa (sáng Thứ 7 → sáng Thứ 2 giờ VN).</div>
     </div>
 
-    <h2>7. Kỳ vọng thực tế với vốn nhỏ</h2>
+    ${this.mk()}
+
+    <h2>7b. Kỳ vọng thực tế với vốn nhỏ</h2>
     <div class="card"><ul style="margin:0;padding-left:18px;line-height:1.7">
       <li>Khoảng <b>14 lệnh/năm</b> (có tháng không có lệnh nào — bình thường). Thắng ~6/10 lệnh; thắng +2R, thua −1R.</li>
       <li>Tài khoản Cent 57$, 0.01 lot, SL ~89$: mỗi lệnh thua ≈ −0.89$, thắng ≈ +1.77$; cả năm kỳ vọng khoảng +5–6$ (+10%). Mục tiêu năm đầu là <b>chứng minh bạn làm đúng luật</b>, không phải kiếm nhiều tiền.</li>

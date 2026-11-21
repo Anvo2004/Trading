@@ -46,6 +46,23 @@ const Live = {
       <p class="muted" style="font-size:12px;margin:6px 0 0">Cùng một luật cho mọi thị trường (xem <a href="#method">📘 Phương pháp</a>). Giá từ Binance/Yahoo, lệch CFD Exness một chút → trên MT5 dùng <b>khoảng cách</b> SL/TP cộng/trừ vào giá khớp thật. Tối đa 3 lệnh mở cùng lúc, không mở 2 lệnh cùng hướng trên các cặp cùng đồng tiền (VD EURUSD + GBPUSD cùng MUA).</p></div>`;
   },
   stat(arr) { const n = arr.length, w = arr.filter(x => x.R > 0).length, R = arr.reduce((q, x) => q + x.R, 0); return n ? `${n} lệnh · thắng ${Math.round(w / n * 100)}% · tổng <b class="${R >= 0 ? 'pos' : 'neg'}">${R >= 0 ? '+' : ''}${R.toFixed(2)}R</b>` : 'chưa có lệnh'; },
+  // Bot GitHub đôi khi trễ → tự tính lại trên trình duyệt bằng dữ liệu trực tiếp (cùng phương pháp, dùng Plan.method())
+  fresh() {
+    const ok = Plan.M_ && Plan.lastRun && Date.now() - Plan.lastRun < 70 * 60e3;
+    if (!ok) {
+      if (!this.freshBusy && $('#plSrc').value === 'live') { this.freshBusy = true; Plan.run(true).finally(() => { this.freshBusy = false; if (Router.cur === 'live') this.render(); }); }
+      return '<div class="card muted" style="margin-bottom:14px">⚡ Đang tính nhận định trực tiếp trên trình duyệt…</div>';
+    }
+    const M = Plan.M_, s = M.st, P = M.pos, px = Plan.H[Plan.H.length - 1].c, dw = d => d === 1 ? 'MUA' : 'BÁN';
+    let t, cls = '', body;
+    if (P) { const R = ((px - P.e) * P.d / P.r).toFixed(2); t = `🟢 ĐANG CÓ LỆNH ${dw(P.d)} — hiện ${R}R`; cls = 'ok'; body = `Vào ${T.fmt(P.t)} ở ${f2(P.e)} · SL ${f2(P.sl)} · TP ${f2(P.tp)} (SL cách ${P.r.toFixed(1)}$). Giữ nguyên, tối đa tới ${T.fmt(P.t + 7 * 86400)}.`; }
+    else if (!s.trD) { t = '⚪ ĐỨNG NGOÀI — D1 chưa có xu hướng rõ'; body = `Giá ${f2(s.dc)}, EMA50 D1 ${f2(s.e50)}.`; }
+    else if (!s.pulled) { t = `🟡 CHỜ HỒI — D1 ${s.trD === 1 ? 'TĂNG' : 'GIẢM'}, chỉ tìm lệnh ${dw(s.trD)}`; body = `RSI H4 ${s.trD === 1 ? 'thấp nhất ' + s.rMin.toFixed(1) + ', cần < 40' : 'cao nhất ' + s.rMax.toFixed(1) + ', cần > 60'} → chưa vào.`; }
+    else if (s.side !== s.trD) { t = '🟡 ĐÃ HỒI — chờ nến H4 đóng lại đúng phía EMA21'; body = `RSI H4 đã đạt, nhưng nến H4 gần nhất đóng ${s.side === 1 ? 'trên' : 'dưới'} EMA21 H4.`; }
+    else { t = `🟠 SẴN SÀNG ${dw(s.trD)} — chờ RSI H1 cắt ${s.trD === 1 ? 'LÊN' : 'XUỐNG'} 50`; cls = 'warn'; body = `RSI H1 hiện ${s.rsi.toFixed(1)}. Khi nến H1 đóng qua 50 → vào ${dw(s.trD)}, SL ≈ ${s.datr.toFixed(1)}$, TP ≈ ${(2 * s.datr).toFixed(1)}$.`; }
+    return `<div class="card" style="margin-bottom:14px;border-color:rgba(76,141,255,.6)"><div class="muted" style="font-size:12.5px;margin-bottom:6px">⚡ Nhận định trực tiếp (tính trên trình duyệt lúc ${T.fmt(Plan.lastRun / 1000, false)}) · giá ${f2(px)} · bản của bot ở dưới</div>
+      <div class="note ${cls}" style="font-size:15px;margin:0"><b>${t}</b></div><p style="margin:8px 0 0;font-size:14px">${body} SL hiện tại = 1×ATR D1 = <b>${s.datr.toFixed(1)}$</b>. Chi tiết chart, ICT và tính lot ở <a href="#plan">📅 Plan</a>.</p></div>`;
+  },
   render() {
     const el = $('#lvOut'); if (!el) return;
     if (!this.d) { el.innerHTML = this.err ? `<div class="note warn">Chưa đọc được nhận định tự động (${esc(this.err)}). Bot GitHub chạy mỗi giờ sau khi mã nguồn được đẩy lên GitHub; trong lúc chờ, dùng trang <a href="#plan">📅 Plan</a> (tự cập nhật mỗi giờ khi đang mở).</div>` : '<div class="card muted">Đang tải…</div>'; return; }
@@ -71,6 +88,7 @@ const Live = {
     const notes = D.notes.slice().reverse().slice(1, this.more ? 240 : 24);
     el.innerHTML = `
       <div class="row muted" style="gap:12px;font-size:12.5px;margin-bottom:8px"><span>Bot cập nhật lúc <b style="color:var(--text)">${T.fmt(D.updated)}</b> (${age} phút trước) · tự chạy mỗi giờ, 24/7</span><span>Nguồn: ${esc(D.src)}</span><button class="btn sm" onclick="Live.load()">↻ Tải lại</button><button class="btn sm" onclick="Plan.askNotify()">🔔 Bật thông báo</button></div>
+      ${age > 90 ? this.fresh() : ''}
       ${age > 90 ? `<div class="note warn" style="font-size:13px">Nhận định đã cũ ${age >= 120 ? Math.floor(age / 60) + ' giờ' : age + ' phút'} — máy chủ GitHub đôi khi chạy trễ hoặc bỏ lượt${new Date().getUTCDay() === 6 || new Date().getUTCDay() === 0 ? ' (cuối tuần thị trường đóng cửa nên giá không đổi)' : ''}. Muốn tính ngay bằng dữ liệu trực tiếp: <a href="#plan" onclick="setTimeout(() => Plan.run(), 300)"><b>mở 📅 Plan và cập nhật</b></a> — cùng phương pháp, tính trên trình duyệt của bạn.</div>` : ''}
       <div class="card" style="border-color:rgba(232,184,74,.5)"><div class="muted" style="font-size:12.5px;margin-bottom:6px">Nhận định mới nhất · dữ liệu tới ${T.fmt(n.t)} · giá ${f2(n.px)} (PAXG ≈ XAUUSD, lệch vài $)</div>${note(n, true)}</div>
       ${this.setups()}

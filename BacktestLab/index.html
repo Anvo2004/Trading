@@ -170,6 +170,7 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
     <a href="#scen" data-p="scen">🎲 Kịch bản thực chiến</a>
     <div class="sec">Thực chiến</div>
     <a href="#method" data-p="method">📘 Phương pháp giao dịch</a>
+    <a href="#week" data-p="week">🗓️ Kế hoạch tuần & ngày</a>
     <a href="#live" data-p="live">🕐 Nhận định theo giờ</a>
     <a href="#plan" data-p="plan">📅 Plan mỗi ngày</a>
     <a href="#lab" data-p="lab">🕹️ Backtest Lab</a>
@@ -237,6 +238,13 @@ code{font-family:var(--mono);background:#0e1422;padding:1px 5px;border-radius:4p
   <p class="lead">Swing XAUUSD theo xu hướng: <b>D1 xác định hướng → H4 chờ nhịp hồi → H1 tìm điểm vào</b>. Được chọn sau khi kiểm tra hàng trăm triệu lệnh mô phỏng trên dữ liệu tick thật của Exness 2021–2026.</p>
   <div id="mtOut"></div>
   <div class="note warn" style="margin-top:14px">Kết quả quá khứ không đảm bảo tương lai. Đây là tài liệu học tập, không phải khuyến nghị đầu tư. Chỉ dùng tiền bạn chấp nhận mất.</div>
+</section>
+
+<!-- ================= KẾ HOẠCH TUẦN & NGÀY ================= -->
+<section class="page" id="p-week">
+  <h1>Kế hoạch tuần & ngày</h1>
+  <p class="lead">Tự lập từ giá trực tiếp theo đúng phương pháp đã train: <b>xu hướng chính của tuần</b>, vùng giá chờ vào lệnh, 3 kịch bản, lịch tin cả tuần, lịch trong ngày và thẻ <b>⏰ chốt xu hướng 9–10h sáng</b>. Tính ngay trên trình duyệt nên luôn mới và tự cập nhật mỗi giờ khi trang đang mở.</p>
+  <div id="wkOut"></div>
 </section>
 
 <!-- ================= NHẬN ĐỊNH THEO GIỜ ================= -->
@@ -481,5 +489,6 @@ TRƯỚC KHI BẤM LỆNH
 <script src="report.js"></script>
 <script src="method.js"></script>
 <script src="live.js"></script>
+<script src="week.js"></script>
 </body>
 </html>

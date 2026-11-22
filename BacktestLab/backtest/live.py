@@ -240,15 +240,35 @@ def levels(H):
     if D['mo']: out.append(('Midnight Open', D['mo']))
     return [{'n': a, 'p': round(b, 2)} for a, b in out]
 
+FF_CACHE = {}
+def ff_week():
+    """Lịch ForexFactory cả tuần (nguồn hay giới hạn số lần gọi → chỉ gọi 1 lần mỗi lượt chạy)."""
+    if 'ev' not in FF_CACHE:
+        try: FF_CACHE['ev'] = get('https://nfs.faireconomy.media/ff_calendar_thisweek.json', 2)
+        except Exception as e: print('Không lấy được lịch tin:', e); FF_CACHE['ev'] = None
+    return FF_CACHE['ev']
+
 def news():
-    try: ev = get('https://nfs.faireconomy.media/ff_calendar_thisweek.json', 2)
-    except Exception as e: print('Không lấy được lịch tin:', e); return None
+    ev = ff_week()
+    if ev is None: return None
     now = time.time(); out = []
     for e in ev:
         if e.get('country') != 'USD' or e.get('impact') != 'High': continue
         try: t = dt.datetime.fromisoformat(e['date']).timestamp()
         except Exception: continue
         if now - 3 * 3600 <= t <= now + 36 * 3600: out.append({'t': int(t), 'title': e.get('title', ''), 'fc': e.get('forecast', ''), 'prev': e.get('previous', '')})
+    return sorted(out, key=lambda x: x['t'])
+
+def week_news(prev):
+    """Tin USD đỏ/cam + ngày nghỉ của cả tuần cho trang Kế hoạch tuần. Lỗi mạng → giữ bản cũ nếu vẫn còn trong tuần."""
+    ev = ff_week(); now = time.time()
+    if ev is None: return prev or []   # trang web tự lọc theo ngày nên bản cũ của tuần trước không bị hiện nhầm
+    out = []
+    for e in ev:
+        if e.get('country') != 'USD' or e.get('impact') not in ('High', 'Medium', 'Holiday'): continue
+        try: t = dt.datetime.fromisoformat(e['date']).timestamp()
+        except Exception: continue
+        out.append({'t': int(t), 'title': e.get('title', ''), 'imp': e.get('impact', ''), 'fc': e.get('forecast', ''), 'prev': e.get('previous', '')})
     return sorted(out, key=lambda x: x['t'])
 
 # ---------------- viết nhận định ----------------
@@ -334,7 +354,7 @@ def run(prev_path, out_dir):
     now_t = int(time.time())
     M = main_method(H, D); M4 = h4_method(H, D)
     H4 = agg(H, 14400); lc4 = H[-1]['t'] + 3600 >= H4[-1]['t'] + 14400
-    ictS, ictO = ict_text(H, H4, lc4); lv = levels(H); nw = news()
+    ictS, ictO = ict_text(H, H4, lc4); lv = levels(H); nw = news(); wn = week_news(prev.get('week_news'))
     last_sig = M[1] or (M[0][-1] if M[0] else None); m15 = None
     if last_sig and now_t - last_sig['t'] <= 8 * 86400: m15 = m15_entry(last_sig, now_t)
     note = write_note(now_t, H, D, src, M, M4, ictS, lv, nw, prev.get('pos'), prev.get('pos4'), m15)
@@ -351,7 +371,7 @@ def run(prev_path, out_dir):
     notes = [x for x in prev.get('notes', []) if x.get('bar') != note['bar']] + [note]
     out = {'updated': now_t, 'src': src, 'px': round(H[-1]['c'], 2), 'bar': H[-1]['t'], 'note': note, 'notes': notes[-KEEP_NOTES:],
            'pos': M[1], 'state': M[2], 'pos4': M4[1], 'state4': M4[2], 'journal': sorted(J.values(), key=lambda x: x['t']), 'journal4': sorted(J4.values(), key=lambda x: x['t']),
-           'levels': lv, 'ind': table(H, D), 'm15': m15, 'markets': ms, 'ict': ictO, 'news': nw, 'from': H[0]['t']}
+           'levels': lv, 'ind': table(H, D), 'm15': m15, 'markets': ms, 'ict': ictO, 'news': nw, 'week_news': wn, 'from': H[0]['t']}
     os.makedirs(out_dir, exist_ok=True)
     json.dump(out, open(os.path.join(out_dir, 'live.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     print(note['title']); [print(' -', l) for l in note['lines']]

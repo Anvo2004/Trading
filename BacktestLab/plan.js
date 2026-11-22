@@ -90,7 +90,7 @@ const Plan = {
         const end = Lab.idx || Data.bars.length;
         this.M = Data.bars.slice(Math.max(0, end - 1500), end); this.H = this.agg(Data.bars.slice(0, end), 3600); this.Dd = this.agg(Data.bars.slice(0, end), 86400); this.srcName = Data.name + ' (tới nến đang replay)';
       }
-      this.lastRun = Date.now(); this.build(); this.autoInfo();
+      this.lastRun = Date.now(); this.build(); this.autoInfo(); if (typeof Week !== 'undefined') Week.onData();
     } catch (e) { if (silent && this.H.length) { UI.toast('Tự cập nhật lỗi mạng, sẽ thử lại giờ sau'); return; } out.innerHTML = `<div class="note bad">Không tải được dữ liệu: ${esc(e.message)}. Thử lại, hoặc chọn nguồn "Dữ liệu đã nạp ở Lab".</div>`; }
     finally { this.busy = false; }
   },

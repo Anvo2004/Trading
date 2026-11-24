@@ -13,7 +13,7 @@ const Plan = {
     $('#plAuto').checked = Store.get('plAuto', true);
     $('#plAuto').onchange = () => { Store.set('plAuto', $('#plAuto').checked); this.schedule(); };
     document.addEventListener('visibilitychange', () => { if (!document.hidden && this.auto() && this.lastRun && Date.now() - this.lastRun > 62 * 60e3) this.run(true); });
-    this.schedule();
+    this.schedule(); setInterval(() => this.ltfRefresh(), 60e3);
     const loop = () => { if (Router.cur === 'plan') this.paint(); requestAnimationFrame(loop); }; requestAnimationFrame(loop);
     this.renderHist();
   },
@@ -83,12 +83,13 @@ const Plan = {
     this.keepRange = silent && this.chart ? this.chart.timeScale().getVisibleLogicalRange() : null;
     try {
       if (src === 'live') {
-        const [h1, m5, d1] = await Promise.all([this.fetchK('1h', 6000), this.fetchK('5m', 1000), this.fetchK('1d', 400)]);
-        this.H = h1; this.M = m5; this.Dd = d1; this.srcName = 'PAXG/USDT (Binance) — gần với XAUUSD';
+        const [h1, m5, d1, m15, m30] = await Promise.all([this.fetchK('1h', 6000), this.fetchK('5m', 1500), this.fetchK('1d', 400), this.fetchK('15m', 1000), this.fetchK('30m', 1000)]);
+        this.H = h1; this.M = m5; this.Dd = d1; this.M15 = m15; this.M30 = m30; this.ltfAt = Date.now(); this.srcName = 'PAXG/USDT (Binance) — gần với XAUUSD';
       } else {
         if (!Data.bars.length) throw new Error('Chưa nạp dữ liệu ở Backtest Lab');
         const end = Lab.idx || Data.bars.length;
         this.M = Data.bars.slice(Math.max(0, end - 1500), end); this.H = this.agg(Data.bars.slice(0, end), 3600); this.Dd = this.agg(Data.bars.slice(0, end), 86400); this.srcName = Data.name + ' (tới nến đang replay)';
+        const s0 = Data.bars.slice(Math.max(0, end - 12000), end); this.M15 = Data.tf <= 900 ? this.agg(s0, 900) : []; this.M30 = Data.tf <= 1800 ? this.agg(s0, 1800) : [];
       }
       this.lastRun = Date.now(); this.build(); this.autoInfo(); if (typeof Week !== 'undefined') Week.onData();
     } catch (e) { if (silent && this.H.length) { UI.toast('Tự cập nhật lỗi mạng, sẽ thử lại giờ sau'); return; } out.innerHTML = `<div class="note bad">Không tải được dữ liệu: ${esc(e.message)}. Thử lại, hoặc chọn nguồn "Dữ liệu đã nạp ở Lab".</div>`; }
@@ -124,11 +125,8 @@ const Plan = {
     const A = this.analyze(this.H, this.M, Infinity); if (!A) return $('#plOut').innerHTML = '<div class="note bad">Không đủ dữ liệu.</div>';
     const off = this.offset(), o = p => p + off, F = p => f2(o(p));
     this.last = A; this.off_ = off;
-    const ib = A.H.slice(-300); this.ictB = ib;
-    const H4 = this.agg(A.H, 14400), lastB = A.H[A.H.length - 1];
-    const firstIdx = t => { let lo = 0, hi = ib.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ib[m].t < t) lo = m + 1; else hi = m; } return lo; };
-    this.ictR = ICT.analyze(ib.map(b => ({ o: b.o, h: b.h, l: b.l, c: b.c })), 3, { htf: { bars: H4.filter(b => b.t >= ib[0].t), tf: 14400, name: 'H4', map: (b, end) => firstIdx(end ? b.t + 14400 : b.t),
-      lastClosed: (() => { const hb = H4.filter(b => b.t >= ib[0].t); return lastB.t + 3600 >= hb[hb.length - 1].t + 14400 ? hb.length - 1 : hb.length - 2; })() } });
+    this.tf = this.tf || Store.get('plTf', 'H1'); if (this.tfBars(this.tf).length < 20) this.tf = 'H1';
+    this.ictCompute();
     const up = A.lv.filter(L => L.p > A.px && !L.taken && L.kind === 'liq').sort((a, b) => a.p - b.p);
     const dn = A.lv.filter(L => L.p < A.px && !L.taken && L.kind === 'liq').sort((a, b) => b.p - a.p);
     const zs = z => `${F(z.lo)}–${F(z.hi)} (chạm ${z.n} lần)`;
@@ -193,9 +191,12 @@ const Plan = {
       </div>
       ${this.indPanel()}
       ${this.swingPanel(off)}
+      ${this.mtfPanel()}
+      <div class="card" style="margin-top:14px"><div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h4 style="margin:0" id="plChartTitle">${this.chartTitle()}</h4>
+        <div class="row" style="gap:10px;flex-wrap:wrap"><div class="row" id="plTfBtns" style="gap:4px">${this.TFS.map(([n]) => `<button class="btn sm ${this.tf === n ? 'on' : ''}" data-tf="${n}" onclick="Plan.setTF('${n}')">${n}</button>`).join('')}</div>
+        <div class="row" id="plIctBtns" style="gap:6px">${[['fvg', 'FVG'], ['bos', 'BOS / MSS'], ['crt', 'CRT ' + (this.HTF[this.tf] || '—')], ['sw', 'HH/HL/LH/LL']].map(([k, n]) => `<button class="btn sm ${this.show[k] ? 'on' : ''}" data-k="${k}" onclick="Plan.togICT('${k}')">${n}</button>`).join('')}</div></div></div>
+        <div id="plChart" style="height:480px;position:relative"></div><div class="muted" id="plLtfInfo" style="font-size:12px;margin-top:6px">${this.ltfInfo()}</div></div>
       ${this.ictCard()}
-      <div class="card" style="margin-top:14px"><div class="row" style="justify-content:space-between;align-items:center;gap:8px"><h4 style="margin:0">Chart H1 + EMA9 (trắng) / EMA21 (xanh) + các mức + ICT</h4>
-        <div class="row" id="plIctBtns" style="gap:6px">${[['fvg', 'FVG'], ['bos', 'BOS / MSS'], ['crt', 'CRT H4'], ['sw', 'HH/HL/LH/LL']].map(([k, n]) => `<button class="btn sm ${this.show[k] ? 'on' : ''}" data-k="${k}" onclick="Plan.togICT('${k}')">${n}</button>`).join('')}</div></div><div id="plChart" style="height:460px;position:relative"></div></div>
       <div class="row" style="margin-top:10px"><button class="btn" onclick="Plan.copy()">📋 Sao chép plan dạng chữ</button><button class="btn" onclick="Plan.toLab()">Mở Backtest Lab với dữ liệu này</button></div>`;
     this.text = `PLAN XAUUSD ${vnDate.slice(3, 13)}\nGiá: ${F(A.px)} | D1: ${word} | H4: ${['GIẢM', 'NGANG', 'TĂNG'][A.h4.v + 1]} | ${A.prem ? 'Premium' : 'Discount'} (50% = ${F(A.mid)})\n${main.t}\n- Vùng: ${main.zone}\n- Vào: ${main.how}\n- ${main.sl}\n- ${main.tp}\n${alt}\n${inval}\nKillzone VN: London ${kzVN(120, 300)}, NY AM ${kzVN(420, 600)}`;
     this.drawChart(A, off);
@@ -205,16 +206,16 @@ const Plan = {
   drawChart(A, off) {
     const el = $('#plChart'); if (!el || typeof LightweightCharts === 'undefined') return;
     if (this.chart) { try { this.chart.remove(); } catch (e) { } }
+    el.querySelectorAll('canvas.plOv').forEach(c => c.remove());   // bỏ lớp vẽ ICT cũ (khi đổi khung / tự cập nhật)
     const ch = this.chart = LightweightCharts.createChart(el, { autoSize: true, layout: { background: { type: 'solid', color: '#0b0f17' }, textColor: '#8a96ad' }, grid: { vertLines: { color: '#131a29' }, horzLines: { color: '#131a29' } }, timeScale: { timeVisible: true, borderColor: '#243049' }, rightPriceScale: { borderColor: '#243049' } });
-    const H = A.H.slice(-300), cs = this.cs = ch.addCandlestickSeries({ upColor: '#22c58b', downColor: '#f0506e', borderVisible: false, wickUpColor: '#22c58b', wickDownColor: '#f0506e' });
+    const all = this.tfBars(this.tf), H = all.slice(-this.NB), cs = this.cs = ch.addCandlestickSeries({ upColor: '#22c58b', downColor: '#f0506e', borderVisible: false, wickUpColor: '#22c58b', wickDownColor: '#f0506e' });
     cs.setData(H.map(b => ({ time: b.t + 7 * 3600, open: b.o + off, high: b.h + off, low: b.l + off, close: b.c + off })));
-    const cl = A.H.map(b => b.c), e9 = this.ema(cl, 9).slice(-300), e21 = this.ema(cl, 21).slice(-300);
-    ch.addLineSeries({ color: '#ffffff', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }).setData(H.map((b, i) => ({ time: b.t + 7 * 3600, value: e9[i] + off })));
-    ch.addLineSeries({ color: '#4c8dff', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }).setData(H.map((b, i) => ({ time: b.t + 7 * 3600, value: e21[i] + off })));
+    const cl = all.map(b => b.c), line = (n, color, style = 0) => { const e = this.ema(cl, n).slice(-this.NB); ch.addLineSeries({ color, lineWidth: 1, lineStyle: style, priceLineVisible: false, lastValueVisible: false }).setData(H.map((b, i) => ({ time: b.t + 7 * 3600, value: e[i] + off }))); };
+    line(9, '#ffffff'); line(21, '#4c8dff'); line(50, '#e8b84a', 2);
     A.lv.forEach(L => cs.createPriceLine({ price: L.p + off, color: L.kind === 'ref' ? '#8a96ad' : L.taken ? '#4b5563' : L.p > A.px ? '#f0506e' : '#22c58b', lineWidth: 1, lineStyle: 2, title: L.n }));
     [...A.zUp, ...A.zDn].forEach(z => { cs.createPriceLine({ price: z.hi + off, color: '#e8b84a', lineWidth: 1, lineStyle: 1, title: '' }); cs.createPriceLine({ price: z.lo + off, color: '#e8b84a', lineWidth: 1, lineStyle: 1, title: z.lo > A.px ? 'Kháng cự' : 'Hỗ trợ' }); });
-    const cv = document.createElement('canvas'); cv.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:2'; el.appendChild(cv); this.cv = cv;
-    ch.timeScale().setVisibleLogicalRange(this.keepRange || { from: H.length - 120, to: H.length + 5 }); this.keepRange = null;
+    const cv = document.createElement('canvas'); cv.className = 'plOv'; cv.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:2'; el.appendChild(cv); this.cv = cv;
+    ch.timeScale().setVisibleLogicalRange(this.keepRange || { from: H.length - (this.tf === 'D1' ? 90 : 120), to: H.length + 5 }); this.keepRange = null;
   },
   paint() {
     if (!this.chart || !this.cv || !this.ictR || !document.body.contains(this.cv)) return;
@@ -362,14 +363,144 @@ const Plan = {
     const info = $('#plAutoInfo'); if (!info) return;
     info.innerHTML = (this.lastRun ? `Cập nhật lúc <b>${T.fmt(this.lastRun / 1000, false)}</b> · ` : '') + (this.auto() ? `lần tới ${T.fmt(this.nextAt / 1000, false)} (giờ VN)` : 'tự cập nhật đang tắt');
   },
+  // ================= ĐA KHUNG: M5 · M15 · M30 · H1 · H4 · D1 =================
+  TFS: [['M5', 300], ['M15', 900], ['M30', 1800], ['H1', 3600], ['H4', 14400], ['D1', 86400]],
+  HTF: { M5: 'H1', M15: 'H1', M30: 'H4', H1: 'H4', H4: 'D1', D1: null },   // khung lớn dùng cho CRT
+  NB: 300,                                                                 // số nến hiển thị & phân tích ICT
+  tf: null,
+  tfSec(n) { return (this.TFS.find(x => x[0] === n) || [0, 3600])[1]; },
+  tfBars(n) { return n === 'M5' ? this.M || [] : n === 'M15' ? this.M15 || [] : n === 'M30' ? this.M30 || [] : n === 'H1' ? this.H || [] : n === 'H4' ? this.agg(this.H || [], 14400) : n === 'D1' ? this.Dd || [] : []; },
+  closedBars(n) { const B = this.tfBars(n), sec = this.tfSec(n), now = Date.now() / 1000; return $('#plSrc').value === 'live' ? B.filter(b => b.t + sec <= now) : B; },
+  chartTitle() { return `Chart ${this.tf} + EMA9 (trắng) / EMA21 (xanh) / EMA50 (vàng, nét đứt) + các mức + ICT`; },
+  ltfInfo() {
+    const live = $('#plSrc').value === 'live', small = ['M5', 'M15', 'M30'].includes(this.tf);
+    return live ? (small ? `Khung nhỏ tự tải lại mỗi 5 phút khi đang mở trang này${this.ltfAt ? ` · lần cuối ${T.fmt(this.ltfAt / 1000, false)}` : ''}.` : 'Khung H1/H4/D1 tự cập nhật mỗi giờ (sau khi nến H1 đóng).') + ' Bấm một dòng trong bảng đa khung để mở khung đó.' : 'Đang dùng dữ liệu replay từ Backtest Lab.';
+  },
+  ictCompute() {
+    const tf = this.tf, sec = this.tfSec(tf), all = this.tfBars(tf); if (all.length < 20) { this.ictB = null; this.ictR = null; return; }
+    const ib = all.slice(-this.NB), lastB = ib[ib.length - 1]; this.ictB = ib;
+    const hn = this.HTF[tf]; let opt = {};
+    if (hn) {
+      const hs = this.tfSec(hn), HB = (hn === 'D1' ? this.agg(this.H, 86400) : this.tfBars(hn)).filter(b => b.t >= ib[0].t);
+      const firstIdx = t => { let lo = 0, hi = ib.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ib[m].t < t) lo = m + 1; else hi = m; } return lo; };
+      if (HB.length > 1) opt = { htf: { bars: HB, tf: hs, name: hn, map: (b, end) => firstIdx(end ? b.t + hs : b.t), lastClosed: lastB.t + sec >= HB[HB.length - 1].t + hs ? HB.length - 1 : HB.length - 2 } };
+    }
+    this.ictR = ICT.analyze(ib.map(b => ({ o: b.o, h: b.h, l: b.l, c: b.c })), 3, opt);
+  },
+  setTF(n) {
+    if (this.tfBars(n).length < 20) return UI.toast('Chưa có dữ liệu khung ' + n + ' — bấm cập nhật lại');
+    this.tf = n; Store.set('plTf', n); this.ictCompute(); this.keepRange = null; this.drawChart(this.last, this.off_);
+    const c = $('#plIctCard'); if (c) c.outerHTML = this.ictCard();
+    $$('#plTfBtns button').forEach(b => b.classList.toggle('on', b.dataset.tf === n));
+    const t = $('#plChartTitle'); if (t) t.textContent = this.chartTitle();
+    const cb = $('#plIctBtns button[data-k="crt"]'); if (cb) cb.textContent = 'CRT ' + (this.HTF[n] || '—');
+    const m = $('#plMtf'); if (m) m.outerHTML = this.mtfPanel();
+    const li = $('#plLtfInfo'); if (li) li.innerHTML = this.ltfInfo();
+  },
+  // khung nhỏ (M5/M15/M30): tải lại phần mới nhất mỗi 5 phút khi đang xem → chart & bảng đa khung luôn mới
+  async ltfRefresh() {
+    if (this.ltfBusy || Router.cur !== 'plan' || !this.last || $('#plSrc').value !== 'live' || document.hidden) return;
+    if (this.ltfAt && Date.now() - this.ltfAt < 5 * 60e3) return;
+    this.ltfBusy = true;
+    try {
+      const [m5, m15, m30] = await Promise.all([this.fetchK('5m', 1500), this.fetchK('15m', 1000), this.fetchK('30m', 1000)]);
+      this.M = m5; this.M15 = m15; this.M30 = m30; this.ltfAt = Date.now();
+      if (['M5', 'M15', 'M30'].includes(this.tf)) {
+        const ts = this.chart && this.chart.timeScale(), r = ts && ts.getVisibleLogicalRange(), n0 = this.ictB ? this.ictB.length : 0;
+        this.ictCompute(); this.keepRange = r && r.to < n0 - 3 ? r : null; this.drawChart(this.last, this.off_);
+        const c = $('#plIctCard'); if (c) c.outerHTML = this.ictCard();
+      }
+      const m = $('#plMtf'); if (m) m.outerHTML = this.mtfPanel();
+      const li = $('#plLtfInfo'); if (li) li.innerHTML = this.ltfInfo();
+    } catch (e) { } finally { this.ltfBusy = false; }
+  },
+  mtfRow(n) {
+    const B = this.closedBars(n); if (B.length < 60) return null;
+    const I = this.ind(B), k = B.length - 1, c = I.c[k], e21 = I.e21[k], e50 = I.e50[k];
+    const emaTr = c > e21 && e21 > e50 ? 1 : c < e21 && e21 < e50 ? -1 : 0;
+    const S = B.slice(-this.NB), st = ICT.structure(S.map(b => ({ o: b.o, h: b.h, l: b.l, c: b.c })), 3), ev = st.ev[st.ev.length - 1];
+    const px = this.tfBars(n).slice(-1)[0].c, fv = ICT.fvgs(S, Math.max(2, S.length - 300)).filter(f => !f.filled);
+    const fUp = fv.filter(f => f.bot > px).sort((a, b) => a.bot - b.bot)[0], fDn = fv.filter(f => f.top < px).sort((a, b) => b.top - a.top)[0];
+    let cross = null; for (let i = k; i > k - 60 && i > 0; i--) if ((I.e9[i] - I.e21[i]) * (I.e9[i - 1] - I.e21[i - 1]) < 0) { cross = { up: I.e9[i] > I.e21[i], t: B[i].t + this.tfSec(n) }; break; }
+    return { n, c, e21, e50, emaTr, st: st.trend, ev: ev ? { ...ev, t: S[ev.i1].t + this.tfSec(n) } : null, rsi: I.rsi[k], e9up: I.e9[k] > I.e21[k], cross, fUp, fDn, atr: I.atr[k] };
+  },
+  // Entry M15 (giống bot live.py): sau tín hiệu H1, trong 24h chờ EMA9 M15 hồi qua EMA21 rồi cắt lại → vào ở giá đóng nến M15
+  m15Entry(sig) {
+    const now = Date.now() / 1000, B = (this.M15 || []).filter(b => b.t + 900 <= now);
+    const d = sig.d, p0 = sig.e, r0 = sig.r, ts = sig.t, sl0 = p0 - d * r0, tp0 = p0 + 2 * d * r0;
+    if (!B.length || B[B.length - 1].t + 900 < ts) return { st: 'nodata', d, sig_t: ts };
+    const I = this.ind(B), W = ts + 86400, out = { st: 'waiting', sig_t: ts, d, p0, sl0, tp0 }; let pulled = false, ext = p0;
+    for (let k = 0; k < B.length; k++) {
+      const b = B[k], end = b.t + 900; if (end <= ts) continue;
+      if (end > W) return { ...out, st: 'expired' };
+      if (d === 1 ? b.l <= sl0 : b.h >= sl0) return { ...out, st: 'sl_first' };
+      if (d === 1 ? b.h >= tp0 : b.l <= tp0) return { ...out, st: 'tp_first' };
+      if (d === 1 ? I.e9[k] < I.e21[k] : I.e9[k] > I.e21[k]) pulled = true;
+      else if (pulled) {
+        const e = b.c; let sl = ext - d * 0.3 * I.atr[k]; if (Math.abs(e - sl) < 0.2 * r0) sl = e - d * 0.2 * r0;
+        const rk = Math.abs(e - sl); if ((tp0 - e) * d <= 0.3 * rk) return { ...out, st: 'no_room' };
+        const res = { ...out, st: 'open', te: end, e, sl, tp: tp0, risk: rk };
+        for (const q of B.slice(k + 1)) {
+          const qe = q.t + 900;
+          if (d === 1 ? q.l <= sl : q.h >= sl) return { ...res, st: 'closed', why: 'SL', xt: qe, R: -1 };
+          if (d === 1 ? q.h >= tp0 : q.l <= tp0) return { ...res, st: 'closed', why: 'TP', xt: qe, R: (tp0 - e) * d / rk };
+          if (qe - end >= 7 * 86400) return { ...res, st: 'closed', why: '7 ngày', xt: qe, R: (q.c - e) * d / rk };
+        }
+        return { ...res, R_now: (B[B.length - 1].c - e) * d / rk };
+      }
+      ext = d === 1 ? Math.min(ext, b.l) : Math.max(ext, b.h);
+    }
+    return now > W ? { ...out, st: 'expired' } : { ...out, pulled, ext, left_h: (W - now) / 3600 };
+  },
+  m15Text(m) {
+    const F = p => f2(p + (this.off_ || 0)), dw = m.d === 1 ? 'MUA' : 'BÁN';
+    if (m.st === 'waiting') return m.pulled ? `EMA9 M15 đã hồi ${m.d === 1 ? 'xuống dưới' : 'lên trên'} EMA21 ✅ → chờ EMA9 cắt <b>${m.d === 1 ? 'LÊN' : 'XUỐNG'}</b> lại EMA21 rồi vào ${dw} ở giá đóng nến M15. SL ${m.d === 1 ? 'dưới' : 'trên'} ${F(m.ext)} − 0.3×ATR M15, TP ${F(m.tp0)}.` : `Chờ EMA9 M15 hồi ${m.d === 1 ? 'xuống dưới' : 'lên trên'} EMA21 (còn ${m.left_h.toFixed(1)} giờ).`;
+    if (m.st === 'open') return `<b>ĐÃ KÍCH HOẠT</b> lúc ${T.fmt(m.te)} · ${dw} ${F(m.e)} · SL ${F(m.sl)} (${m.risk.toFixed(1)}$) · TP ${F(m.tp)} · hiện ${m.R_now >= 0 ? '+' : ''}${m.R_now.toFixed(2)}R.`;
+    if (m.st === 'closed') return `Vào ${T.fmt(m.te)} ở ${F(m.e)}, đã đóng ${T.fmt(m.xt)} (${m.why}) = ${m.R >= 0 ? '+' : ''}${m.R.toFixed(2)}R.`;
+    return { expired: 'Hết 24h không có điểm vào M15 → bỏ cách vào M15 cho tín hiệu này (cách vào gốc vẫn giữ).', sl_first: 'Giá chạm SL gốc trước khi có điểm vào M15 → bỏ.', tp_first: 'Giá chạy tới TP gốc trước khi có điểm vào M15 → bỏ.', no_room: 'Điểm vào M15 quá gần TP → bỏ.', nodata: 'Chưa đủ dữ liệu M15.' }[m.st] || m.st;
+  },
+  mtfPanel() {
+    const M = this.M_, s = M && M.st; if (!s) return '<div id="plMtf"></div>';
+    const off = this.off_ || 0, F = p => f2(p + off), dw = d => d === 1 ? 'MUA' : 'BÁN', now = Date.now() / 1000;
+    const ROLE = { D1: '① Xu hướng chính: giá & độ dốc EMA50', H4: '② Nhịp hồi (RSI H4) · ③a nến đóng so với EMA21', H1: '③b Kích hoạt: RSI H1 cắt 50', M30: 'Tham khảo: cấu trúc của nhịp hồi', M15: 'Entry M15 nâng cao: EMA9/21 hồi rồi cắt lại', M5: 'Tinh chỉnh: quét thanh khoản + MSS tại vùng' };
+    const pill = v => v === 1 ? '<span class="pill up">TĂNG</span>' : v === -1 ? '<span class="pill down">GIẢM</span>' : '<span class="pill gold">ĐAN XEN</span>';
+    const rows = ['D1', 'H4', 'H1', 'M30', 'M15', 'M5'].map(n => this.mtfRow(n)).filter(Boolean);
+    const agree = rows.filter(r => s.trD && r.emaTr === s.trD).length;
+    const tb = rows.map(r => `<tr data-tf="${r.n}" onclick="Plan.setTF('${r.n}')" style="cursor:pointer${r.n === this.tf ? ';background:rgba(232,184,74,.10)' : ''}"><td><b>${r.n}</b>${r.n === this.tf ? ' 👁' : ''}</td><td>${pill(r.emaTr)}<div class="muted mono" style="font-size:11.5px">${F(r.c)} · 21: ${F(r.e21)} · 50: ${F(r.e50)}</div></td>
+      <td>${pill(r.st)}${r.ev ? `<div style="font-size:12px"><b style="color:${r.ev.dir === 1 ? 'var(--up)' : 'var(--down)'}">${r.ev.type} ${r.ev.dir === 1 ? '↑' : '↓'}</b> ${F(r.ev.p)} <span class="muted">${T.fmt(r.ev.t).slice(-16, -11)} ${T.fmt(r.ev.t, false)}</span></div>` : ''}</td>
+      <td class="mono">${r.rsi.toFixed(0)}${r.rsi < 30 ? ' <span class="pill up">quá bán</span>' : r.rsi > 70 ? ' <span class="pill down">quá mua</span>' : ''}</td>
+      <td style="font-size:12px">EMA9 ${r.e9up ? '<b class="pos">trên</b>' : '<b class="neg">dưới</b>'} EMA21${r.cross ? `<div class="muted">cắt ${r.cross.up ? 'lên' : 'xuống'} ${T.fmt(r.cross.t).slice(-16, -11)} ${T.fmt(r.cross.t, false)}</div>` : ''}</td>
+      <td class="mono" style="font-size:12px">${r.fUp ? `↑ ${F(r.fUp.bot)}–${F(r.fUp.top)}` : '↑ —'}<br>${r.fDn ? `↓ ${F(r.fDn.bot)}–${F(r.fDn.top)}` : '↓ —'}</td><td style="font-size:12px">${ROLE[r.n]}</td></tr>`).join('');
+    // checklist từ trên xuống
+    const P = M.pos, last = (M.trades || []).filter(x => x.t >= now - 8 * 86400).pop(), sig = P || last, m15 = sig && this.M15 && this.M15.length ? this.m15Entry(sig) : null;
+    const r5 = rows.find(r => r.n === 'M5'), ok = b => b ? '✅' : '⬜', tShort = t => `${T.fmt(t).slice(-16, -11)} ${T.fmt(t, false)}`;
+    const steps = [
+      [ok(!!s.trD), 'D1', s.trD ? `Xu hướng <b>${s.trD === 1 ? 'TĂNG → chỉ MUA' : 'GIẢM → chỉ BÁN'}</b> (giá ${F(s.dc)} ${s.trD === 1 ? 'trên' : 'dưới'} EMA50 ${F(s.e50)})` : 'Không rõ xu hướng → đứng ngoài'],
+      [ok(s.pulled), 'H4', s.trD ? `RSI H4 ${s.trD === 1 ? 'thấp nhất ' + s.rMin.toFixed(1) + ' (cần < 40)' : 'cao nhất ' + s.rMax.toFixed(1) + ' (cần > 60)'} trong 24 nến · nến H4 gần nhất đóng ${s.side === 1 ? 'trên' : 'dưới'} EMA21 ${s.side === s.trD ? '✅' : '⬜'}` : '—'],
+      [ok(!!P), 'H1', P ? `Tín hiệu <b>${dw(P.d)}</b> lúc ${T.fmt(P.t)} ở ${F(P.e)} · SL ${F(P.sl)} · TP ${F(P.tp)}` : `RSI H1 = ${s.rsi.toFixed(1)} — ${s.trD && s.pulled && s.side === s.trD ? `<b>chờ cắt ${s.trD === 1 ? 'LÊN' : 'XUỐNG'} 50</b>` : 'chưa tới bước này'}${last && !P ? ` · tín hiệu gần nhất ${dw(last.d)} ${tShort(last.t)} đã đóng (${last.why} ${last.R > 0 ? '+' : ''}${last.R}R)` : ''}`],
+      [ok(m15 && (m15.st === 'open' || m15.st === 'closed')), 'M15', m15 ? `Tín hiệu ${dw(m15.d)} ${tShort(m15.sig_t)}: ${this.m15Text(m15)}` : 'Chỉ dùng SAU khi H1 có tín hiệu (chưa có tín hiệu trong 8 ngày qua).'],
+      ['👁', 'M5', r5 && r5.ev ? `Sự kiện cấu trúc gần nhất: <b>${r5.ev.type} ${r5.ev.dir === 1 ? 'TĂNG' : 'GIẢM'}</b> lúc ${tShort(r5.ev.t)}${s.trD ? (r5.ev.dir === s.trD ? ' — cùng hướng D1 ✅' : ' — ngược hướng D1 (đang hồi)') : ''}. Dùng để nhìn điểm vào đẹp hơn, <b>không</b> thay luật.` : 'Chưa đủ dữ liệu M5.'],
+    ].map(([i, n, t]) => `<div style="display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="font-size:17px">${i}</span><div><b>${n}</b> · ${t}</div></div>`).join('');
+    const small = rows.filter(r => ['M5', 'M15', 'M30'].includes(r.n));
+    const verdict = !s.trD ? '⚪ D1 không có xu hướng → không vào lệnh ở bất kỳ khung nào.'
+      : P ? `🔔 Đang có tín hiệu ${dw(P.d)}. Vào theo <b>cách gốc</b> (giá thị trường, SL/TP gốc, vào trễ tới 8h vẫn được) hoặc <b>Entry M15</b> nếu đã kích hoạt (SL hẹp hơn, TP giữ nguyên — chuỗi thua có thể dài hơn).`
+      : !s.pulled ? `🟡 Chưa tới lúc vào: H4 chưa hồi đủ (RSI H4 ${s.trD === 1 ? 'chưa xuống 40' : 'chưa lên 60'}). Khung nhỏ ${small.filter(r => r.emaTr === -s.trD).length ? 'đang có nhịp hồi ngược — cứ để nó hồi, chờ RSI H4 đạt ngưỡng' : 'vẫn chạy cùng xu hướng — không ' + dw(s.trD).toLowerCase() + ' đuổi'}.`
+      : s.side !== s.trD ? '🟡 H4 đã hồi đủ, chờ nến H4 đóng lại đúng phía EMA21 H4. Xem M15/M5: khi EMA9 cắt lại theo hướng D1 và có MSS cùng hướng là dấu hiệu sắp kích hoạt.'
+      : `🟠 Sẵn sàng: chờ nến H1 đóng với RSI H1 cắt ${s.trD === 1 ? 'lên' : 'xuống'} 50. Mở M15/M5 để thấy nhịp đảo chiều sớm.`;
+    return `<div class="card" style="margin-top:14px" id="plMtf"><h4>🧭 Đa khung từ trên xuống: D1 → H4 → H1 → M30 → M15 → M5 <span class="muted" style="font-weight:400;font-size:12.5px">· ${agree}/${rows.length} khung cùng hướng D1 (theo EMA) · bấm một dòng để xem chart khung đó</span></h4>
+      <div class="tblwrap"><table class="tbl"><tr><th>Khung</th><th>Xu hướng EMA (giá/21/50)</th><th>Cấu trúc ICT</th><th>RSI</th><th>EMA9/21</th><th>FVG chưa lấp gần nhất</th><th>Vai trò trong phương pháp</th></tr>${tb}</table></div>
+      <div class="grid g2" style="margin-top:12px"><div><h4 style="margin:0 0 4px">🎯 Checklist điểm vào (đúng thứ tự)</h4>${steps}</div>
+        <div><h4 style="margin:0 0 4px">Kết luận</h4><div class="note ${P ? 'ok' : s.trD && s.pulled ? 'warn' : ''}" style="font-size:13.5px;margin:0">${verdict}</div>
+        <p class="muted" style="font-size:12px;margin:8px 0 0">Từ backtest 2021–2026: vào lệnh bằng M5/M15 với SL gốc <b>không</b> tốt hơn vào thẳng ở H1. Entry M15 (SL hẹp, TP gốc) cho +1.05R/lệnh nhưng chỉ thắng 32%, có lúc thua 10 lệnh liên tiếp. M5/M30 dùng để <b>nhìn</b> nhịp đảo chiều, không phải luật vào lệnh riêng.</p></div></div></div>`;
+  },
   // ---- ICT trên chart Plan ----
   show: null,
   togICT(k) { this.show[k] = !this.show[k]; Store.set('plShow', this.show); $$('#plIctBtns button').forEach(b => b.classList.toggle('on', !!this.show[b.dataset.k])); },
   ictCard() {
-    const R = this.ictR; if (!R) return '';
+    const R = this.ictR; if (!R) return '<div id="plIctCard"></div>';
     const S = ICT.summary(R, this.ictB, i => T.fmt(this.ictB[Math.max(0, Math.min(this.ictB.length - 1, i))].t).slice(3), p => f2(p + this.off_));
-    return `<div class="card" style="margin-top:14px"><h4>🧩 Cấu trúc ICT trên H1 (tự động, vẽ trên chart bên dưới)</h4><ul style="margin:6px 0 6px 18px;padding:0;font-size:13.5px">${S.map(x => `<li style="margin:3px 0">${x}</li>`).join('')}</ul>
-      <p class="muted" style="font-size:12.5px;margin:4px 0 0"><b>BOS</b> (nét đứt) = nến đóng cửa phá đỉnh/đáy swing CÙNG chiều xu hướng → xu hướng tiếp diễn. <b>MSS</b> (nét liền, đậm) = phá NGƯỢC chiều xu hướng cũ → dấu hiệu đảo chiều (còn gọi CHoCH). <b>FVG</b> = khoảng trống giữa nến 1 và nến 3; viền đậm = chưa bị lấp, nét đứt giữa = CE (50%). <b>CRT H4</b> = nến H4 thứ 2 quét đỉnh/đáy nến H4 thứ 1 rồi đóng cửa quay lại trong biên → mục tiêu là cạnh đối diện của biên (nét đứt màu), hỏng nếu giá vượt râu quét (nét xám).
+    return `<div class="card" style="margin-top:14px" id="plIctCard"><h4>🧩 Cấu trúc ICT trên ${this.tf} (tự động, vẽ trên chart phía trên — đổi khung bằng các nút M5…D1)</h4><ul style="margin:6px 0 6px 18px;padding:0;font-size:13.5px">${S.map(x => `<li style="margin:3px 0">${x}</li>`).join('')}</ul>
+      <p class="muted" style="font-size:12.5px;margin:4px 0 0"><b>BOS</b> (nét đứt) = nến đóng cửa phá đỉnh/đáy swing CÙNG chiều xu hướng → xu hướng tiếp diễn. <b>MSS</b> (nét liền, đậm) = phá NGƯỢC chiều xu hướng cũ → dấu hiệu đảo chiều (còn gọi CHoCH). <b>FVG</b> = khoảng trống giữa nến 1 và nến 3; viền đậm = chưa bị lấp, nét đứt giữa = CE (50%). <b>CRT ${this.HTF[this.tf] || ''}</b> = nến khung lớn (M5/M15 → H1 · M30/H1 → H4 · H4 → D1) thứ 2 quét đỉnh/đáy nến thứ 1 rồi đóng cửa quay lại trong biên → mục tiêu là cạnh đối diện của biên (nét đứt màu), hỏng nếu giá vượt râu quét (nét xám).
       Cách dùng với phương pháp: chỉ lấy tín hiệu cùng hướng D1. Khi hệ thống báo "chờ RSI H1 cắt 50", ưu tiên vào lệnh nếu giá vừa có MSS/BOS cùng hướng và đang ở trong FVG/CRT cùng hướng — đây là xác nhận thêm, KHÔNG phải luật đã được backtest.</p></div>`;
   },
   copy() { if (!this.text) return; navigator.clipboard.writeText(this.text).then(() => UI.toast('Đã sao chép plan')); },
